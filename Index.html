@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Obstáculos via Google Sheets</title>
+
+<style>
+/* ================= FAIXA TOPO ================= */
+#topo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #2e2e2e; /* azul corporativo */
+  color: white;
+  padding: 12px 20px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+#topo img {
+  height: 120px;
+  object-fit: contain;
+}
+
+#topo h1 {
+  font-size: 20px;
+  margin: 0;
+  font-weight: 600;
+}
+
+body { font-family: Arial; margin: 10px; }
+button { padding: 8px 14px; font-size: 14px; cursor:pointer; }
+#status { font-weight: bold; margin: 10px 0; }
+#log {
+  background: #111;
+  color: #0f0;
+  padding: 8px;
+  height: 160px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+#tableContainer, #resultadoContainer {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  font-size: 12px;
+  margin-top: 10px;
+}
+#map {
+  width: 100%;
+  height: 500px;
+  margin-top: 12px;
+  border: 1px solid #ccc;
+}
+</style>
+</head>
+
+<body>
+
+<div id="topo">
+  <img src="logo-transpes.png" alt="Transpes">
+  <h1>Sistema de Obstáculos Rodoviários</h1>
+</div>
+
+<h3>Rota</h3>
+<input id="origem" type="text" placeholder="Endereço de origem" style="width:300px">
+<input id="destino" type="text" placeholder="Endereço de destino" style="width:300px">
+<button onclick="calcularRota()">Calcular rota</button>
+
+<br><br>
+<input id="alturaCaminhao" type="number" step="0.01"
+       placeholder="Altura do caminhão (m)" style="width:220px">
+
+<button onclick="verificarObstaculosNaRota()">Verificar obstáculos na rota</button>
+
+<br><br>
+<button onclick="carregarPlanilha()">Carregar obstáculos</button>
+
+<div id="status">Aguardando…</div>
+<div id="log"></div>
+
+<h3>Obstáculos verificados na rota</h3>
+<div id="resultadoContainer"></div>
+
+<div id="map"></div>
+
+<script>
+const CSV_URL =
+  "https://corsproxy.io/?" +
+  encodeURIComponent(
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSmLH9trIDCxy9l_OsUyoHjld5rhAZgYVesTzQu8TGxpuoIRMSLkwwgE-ln1Ux3exuQIIquyzuBb-y3/pub?gid=1651169068&single=true&output=csv"
+  );
+
+let obstacles = [];
+let map, directionsService, directionsRenderer, rotaPolyline;
+let obstacleMarkers = [];
+
+/* ================= UTIL ================= */
+function log(msg) {
+  document.getElementById("log").innerHTML += "▶ " + msg + "<br>";
+}
+function setStatus(msg) {
+  document.getElementById("status").innerText = msg;
+}
+
+/* ================= CSV PARSER CORRETO ================= */
+function parseCSVLine(line) {
+  const result = [];
+  let current = "";
+  let insideQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"' ) {
+      insideQuotes = !insideQuotes;
+    } else if (char === "," && !insideQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result.map(v => v.replace(/^"|"$/g, "").trim());
+}
+
+/* ================= MAPA ================= */
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: -19.5, lng: -44.0 },
+    zoom: 6
+  });
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({
+  preserveViewport: true,
+  draggable: true
+});
+
+  directionsRenderer.setMap(map);
+}
+
+/* ================= PLANILHA ================= */
+async function carregarPlanilha() {
+  obstacles = [];
+  setStatus("Carregando planilha...");
+  const resp = await fetch(CSV_URL);
+  const csv = await resp.text();
+  const linhas = csv.split("\n");
+
+  let validos = 0;
+
+  for (let i = 1; i < linhas.length; i++) {
+    const cols = parseCSVLine(linhas[i]);
+    if (cols.length < 8) continue;
+
+    const alturas = [cols[4], cols[5], cols[6]]
+      .map(v => parseFloat(v.replace(",", ".")))
+      .filter(v => !isNaN(v) && v > 0 && v < 15);
+
+    if (alturas.length === 0) continue;
+
+    const coord = cols[7].split(",");
+    if (coord.length !== 2) continue;
+
+    const lat = parseFloat(coord[0]);
+    const lng = parseFloat(coord[1]);
+    if (isNaN(lat) || isNaN(lng)) continue;
+
+    obstacles.push({
+      via: cols[0],
+      km: cols[2],
+      lat,
+      lng,
+      alturaMax: Math.max(...alturas)
+    });
+
+    validos++;
+  }
+
+  log(`✔ Obstáculos carregados: ${validos}`);
+  setStatus("Planilha carregada");
+  plotarObstaculosNoMapa();
+}
+
+/* ================= PONTOS ================= */
+function limparObstaculos() {
+  obstacleMarkers.forEach(m => m.setMap(null));
+  obstacleMarkers = [];
+}
+
+function plotarObstaculosNoMapa() {
+  limparObstaculos();
+  const bounds = new google.maps.LatLngBounds();
+
+  obstacles.forEach(o => {
+    const marker = new google.maps.Marker({
+      position: { lat: o.lat, lng: o.lng },
+      map,
+      title: `${o.via} | ${o.alturaMax} m`
+    });
+    obstacleMarkers.push(marker);
+    bounds.extend(marker.getPosition());
+  });
+
+  map.fitBounds(bounds);
+}
+
+/* ================= ROTA ================= */
+function calcularRota() {
+  directionsService.route({
+    origin: origem.value,
+    destination: destino.value,
+    travelMode: "DRIVING"
+  }, (res, status) => {
+    if (status !== "OK") return;
+
+    directionsRenderer.setDirections(res);
+
+    // 🔹 Sempre recria a polyline com a rota ATUAL
+    const rotaAtual = directionsRenderer.getDirections();
+    rotaPolyline = new google.maps.Polyline({
+      path: rotaAtual.routes[0].overview_path
+    });
+  });
+}
+
+/* ================= VERIFICAÇÃO ================= */
+
+function verificarObstaculosNaRota() {
+  const alturaCaminhao = parseFloat(
+    document.getElementById("alturaCaminhao").value
+  );
+
+  if (isNaN(alturaCaminhao)) {
+    alert("Informe a altura do caminhão");
+    return;
+  }
+
+    const dir = directionsRenderer.getDirections();
+  if (!dir || !dir.routes || !dir.routes.length) {
+    alert("Calcule a rota primeiro");
+    return;
+  }
+
+  rotaPolyline = new google.maps.Polyline({
+    path: dir.routes[0].overview_path
+  });
+
+  log("🔎 Verificando obstáculos próximos da rota...");
+  setStatus("Analisando obstáculos na rota");
+
+  limparObstaculos();
+  document.getElementById("resultadoContainer").innerHTML = "";
+
+  let criticos = 0;
+  let seguros = 0;
+  const bounds = new google.maps.LatLngBounds();
+
+  obstacles.forEach(o => {
+    if (isNaN(o.lat) || isNaN(o.lng)) return;
+
+    const pos = new google.maps.LatLng(o.lat, o.lng);
+
+    // 🔹 Distância MUITO curta (~30 metros)
+    const perto = google.maps.geometry.poly.isLocationOnEdge(
+      pos,
+      rotaPolyline,
+      0.001
+    );
+
+    if (!perto) return;
+
+    const critico = o.alturaMax < alturaCaminhao;
+
+    const marker = new google.maps.Marker({
+      position: pos,
+      map: map,
+      icon: critico
+        ? "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
+        : "http://maps.google.com/mapfiles/ms/icons/green-dot.png",
+      title: `Altura obstáculo: ${o.alturaMax} m`
+    });
+
+    // ✅ INFO WINDOW (HOVER)
+    const info = new google.maps.InfoWindow({
+      content: `
+        <div style="font-size:12px; line-height:1.4">
+          <strong>${o.via || "-"}</strong><br>
+          KM: ${o.km || "-"}<br>
+          Coordenadas: ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br>
+          Altura obstáculo: <b>${o.alturaMax} m</b><br>
+          Altura caminhão: <b>${alturaCaminhao} m</b><br>
+          <b style="color:${critico ? "red" : "green"}">
+            ${critico ? "❌ BLOQUEANTE" : "✅ OK"}
+          </b>
+        </div>
+      `
+    });
+
+    marker.addListener("mouseover", () => {
+      info.open(map, marker);
+    });
+
+    marker.addListener("mouseout", () => {
+      info.close();
+    });
+
+    obstacleMarkers.push(marker);
+    bounds.extend(pos);
+
+    // ✅ TABELA DE RESULTADOS
+    document.getElementById("resultadoContainer").innerHTML += `
+      <div style="border-bottom:1px solid #eee; padding:4px">
+        <strong>${o.via || "-"}</strong> | KM ${o.km || "-"}<br>
+        ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br>
+        Altura obstáculo: ${o.alturaMax} m<br>
+        Caminhão: ${alturaCaminhao} m<br>
+        <b style="color:${critico ? "red" : "green"}">
+          ${critico ? "❌ BLOQUEANTE" : "✅ OK"}
+        </b>
+      </div>
+    `;
+
+    critico ? criticos++ : seguros++;
+  });
+
+  if (criticos + seguros > 0) {
+    map.fitBounds(bounds);
+  }
+
+  log(`🚧 Obstáculos críticos: ${criticos}`);
+  log(`✅ Obstáculos seguros: ${seguros}`);
+  setStatus(`${criticos} críticos | ${seguros} seguros`);
+}
+
+</script>
+
+<script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4&libraries=geometry&callback=initMap"
+  async defer>
+</script>
+
+</body>
+</html>
