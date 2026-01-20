@@ -221,6 +221,15 @@ function calcularRota() {
 
     directionsRenderer.setDirections(res);
 
+    directionsRenderer.addListener("directions_changed", () => {
+  const directions = directionsRenderer.getDirections();
+  if (!directions) return;
+
+  rotaPolyline.setPath(directions.routes[0].overview_path);
+
+  verificarObstaculosNaRota();
+    });
+
     // 🔹 Sempre recria a polyline com a rota ATUAL
     const rotaAtual = directionsRenderer.getDirections();
     rotaPolyline = new google.maps.Polyline({
@@ -347,4 +356,5 @@ function verificarObstaculosNaRota() {
 
 </body>
 </html>
+
 
