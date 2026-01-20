@@ -142,6 +142,20 @@ function initMap() {
 });
 
   directionsRenderer.setMap(map);
+
+  // ================= AUTOCOMPLETE =================
+  const inputOrigem = document.getElementById("origem");
+  const inputDestino = document.getElementById("destino");
+
+  const options = {
+    componentRestrictions: { country: "br" },
+    fields: ["formatted_address", "geometry"],
+    types: ["geocode"]
+  };
+
+  new google.maps.places.Autocomplete(inputOrigem, options);
+  new google.maps.places.Autocomplete(inputDestino, options);
+
 }
 
 /* ================= PLANILHA ================= */
@@ -350,9 +364,10 @@ function verificarObstaculosNaRota() {
 </script>
 
 <script
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4&libraries=geometry&callback=initMap"
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4&libraries=geometry,places&callback=initMap"
   async defer>
 </script>
+
 
 </body>
 </html>
