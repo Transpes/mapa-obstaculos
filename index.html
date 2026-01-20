@@ -269,6 +269,9 @@ function verificarObstaculosNaRota() {
     alert("Calcule a rota primeiro");
     return;
   }
+
+  rotaPolyline = new google.maps.Polyline({
+    path: dir.routes[0].overview_path
   
   });
 
@@ -369,6 +372,3 @@ function verificarObstaculosNaRota() {
 
 </body>
 </html>
-
-
-
