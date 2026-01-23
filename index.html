@@ -230,13 +230,13 @@ async function carregarPlanilha() {
     const c = parseCSVLine(linhas[i]);
     if (c.length < 8) continue;
 
-    const alturas = [c[4],c[5],c[6]]
+    const alturas = [c[4], c[5], c[6]]
       .map(v => parseFloat(v.replace(",", ".")))
       .filter(v => !isNaN(v));
 
     if (!alturas.length) continue;
 
-    const [lat,lng] = c[7].split(",").map(Number);
+    const [lat, lng] = c[7].split(",").map(Number);
     if (isNaN(lat) || isNaN(lng)) continue;
 
     obstacles.push({
@@ -245,6 +245,7 @@ async function carregarPlanilha() {
       lat, lng,
       alturaMax: Math.max(...alturas)
     });
+
     validos++;
   }
 
@@ -260,10 +261,12 @@ function calcularRota() {
     travelMode: "DRIVING"
   }, (res, status) => {
     if (status !== "OK") return;
+
     directionsRenderer.setDirections(res);
     rotaPolyline = new google.maps.Polyline({
       path: res.routes[0].overview_path
     });
+
     log("🛣️ Rota calculada");
   });
 }
@@ -271,8 +274,9 @@ function calcularRota() {
 /* ===== VERIFICAÇÃO ===== */
 function verificarObstaculosNaRota() {
   if (!rotaPolyline) return;
+
   const altura = parseFloat(alturaCaminhao.value);
-  if (isNaN(altura)) return alert("Informe a altura");
+  if (isNaN(altura)) return alert("Informe a altura do caminhão");
 
   obstacleMarkers.forEach(m => m.setMap(null));
   obstacleMarkers = [];
@@ -281,17 +285,22 @@ function verificarObstaculosNaRota() {
   let criticos = 0;
 
   obstacles.forEach(o => {
-    const pos = new google.maps.LatLng(o.lat,o.lng);
+    const pos = new google.maps.LatLng(o.lat, o.lng);
+
     const perto = google.maps.geometry.poly.isLocationOnEdge(
-      pos, rotaPolyline, 0.001
+      pos,
+      rotaPolyline,
+      0.01 // ✅ CORREÇÃO DEFINITIVA
     );
+
     if (!perto) return;
 
     const critico = o.alturaMax < altura;
     if (critico) criticos++;
 
     const marker = new google.maps.Marker({
-      map, position: pos,
+      map,
+      position: pos,
       icon: critico
         ? "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
         : "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
@@ -312,4 +321,3 @@ function verificarObstaculosNaRota() {
 
 </body>
 </html>
-
