@@ -265,11 +265,14 @@ async function carregarPlanilha() {
     if (isNaN(lat) || isNaN(lng)) continue;
 
     obstacles.push({
-      via: c[0],
-      km: c[2],
-      lat, lng,
-      alturaMax: Math.max(...alturas)
-    });
+  via: c[0],
+  km: c[2],
+  lat,
+  lng,
+  alturas: alturas,              // ← guarda as 3 medidas
+  alturaMax: Math.max(...alturas)
+});
+
 
     validos++;
   }
@@ -335,20 +338,27 @@ function verificarObstaculosNaRota() {
 
     /* ===== INFO WINDOW (NOVO) ===== */
     const infoWindow = new google.maps.InfoWindow({
-      content: `
-        <div style="font-size:12px; line-height:1.4">
-          <strong>${o.via || "Via não informada"}</strong><br>
-          KM: ${o.km || "-"}<br>
-          Coordenadas:<br>
-          ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br><br>
-          Altura do obstáculo: <b>${o.alturaMax.toFixed(2)} m</b><br>
-          Altura do caminhão: <b>${altura.toFixed(2)} m</b><br>
-          <b style="color:${critico ? "red" : "green"}">
-            ${critico ? "❌ BLOQUEANTE" : "✅ OK"}
-          </b>
-        </div>
-      `
-    });
+  content: `
+    <div style="font-size:12px; line-height:1.4">
+      <strong>${o.via || "Via não informada"}</strong><br>
+      KM: ${o.km || "-"}<br>
+      Coordenadas:<br>
+      ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br><br>
+
+      <u>Alturas medidas no local:</u><br>
+      ${o.alturas.map((h, i) => `Altura ${i + 1}: ${h.toFixed(2)} m`).join("<br>")}
+      <br><br>
+
+      Altura do caminhão: <b>${altura.toFixed(2)} m</b><br>
+      Altura considerada (máx): <b>${o.alturaMax.toFixed(2)} m</b><br>
+
+      <b style="color:${critico ? "red" : "green"}">
+        ${critico ? "❌ BLOQUEANTE" : "✅ OK"}
+      </b>
+    </div>
+  `
+});
+
 
     marker.addListener("mouseover", () => {
       infoWindow.open(map, marker);
@@ -386,3 +396,4 @@ function verificarObstaculosNaRota() {
 
 </body>
 </html>
+
