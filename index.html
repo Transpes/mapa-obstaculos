@@ -186,7 +186,7 @@ function parseCSVLine(line) {
   return result.map(v => v.replace(/^"|"$/g,"").trim());
 }
 
-/* ===== MAPA ===== */
+/* ===== MAPA (CORRIGIDO) ===== */
 function initMap() {
   map = new google.maps.Map(document.getElementById("map"), {
     center: { lat: -19.5, lng: -44.0 },
@@ -199,21 +199,20 @@ function initMap() {
   });
   directionsRenderer.setMap(map);
 
+  // 🔁 RECÁLCULO AO ARRASTAR
   directionsRenderer.addListener("directions_changed", () => {
-  const directions = directionsRenderer.getDirections();
-  if (!directions || !directions.routes || !directions.routes.length) return;
+    const directions = directionsRenderer.getDirections();
+    if (!directions || !directions.routes || !directions.routes.length) return;
 
-  // 🔹 RECRIA a polyline com a rota atual arrastada
-  rotaPolyline = new google.maps.Polyline({
-    path: directions.routes[0].overview_path
+    rotaPolyline = new google.maps.Polyline({
+      path: directions.routes[0].overview_path
+    });
+
+    log("↪ Rota alterada manualmente – recalculando obstáculos");
+    verificarObstaculosNaRota();
   });
 
-  log("↪ Rota alterada manualmente – recalculando obstáculos");
-  verificarObstaculosNaRota();
-});
-
-  });
-
+  // AUTOCOMPLETE
   const options = {
     componentRestrictions: { country: "br" },
     fields: ["formatted_address", "geometry"],
@@ -300,7 +299,7 @@ function verificarObstaculosNaRota() {
     const perto = google.maps.geometry.poly.isLocationOnEdge(
       pos,
       rotaPolyline,
-      0.01 // ✅ CORREÇÃO DEFINITIVA
+      0.01
     );
 
     if (!perto) return;
@@ -331,4 +330,3 @@ function verificarObstaculosNaRota() {
 
 </body>
 </html>
-
