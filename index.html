@@ -88,13 +88,30 @@ header img { height: 32px; }
 #resultadoContainer {
   margin-top: 10px;
   font-size: 12px;
-  max-height: 200px;
+  max-height: 240px;
   overflow-y: auto;
   border-top: 1px solid #ccc;
+  padding-top: 6px;
 }
 
 #map {
   flex: 1;
+}
+
+/* ===== LEGENDA ===== */
+.obstaculo-item {
+  padding: 6px;
+  border-bottom: 1px solid #ddd;
+  line-height: 1.4;
+}
+
+.obstaculo-critico {
+  color: #b00000;
+  font-weight: bold;
+}
+
+.obstaculo-ok {
+  color: #0a6b0a;
 }
 
 /* ===== FOOTER ===== */
@@ -186,7 +203,7 @@ function parseCSVLine(line) {
   return result.map(v => v.replace(/^"|"$/g,"").trim());
 }
 
-/* ===== MAPA (CORRIGIDO) ===== */
+/* ===== MAPA ===== */
 function initMap() {
   map = new google.maps.Map(document.getElementById("map"), {
     center: { lat: -19.5, lng: -44.0 },
@@ -199,10 +216,9 @@ function initMap() {
   });
   directionsRenderer.setMap(map);
 
-  // 🔁 RECÁLCULO AO ARRASTAR
   directionsRenderer.addListener("directions_changed", () => {
     const directions = directionsRenderer.getDirections();
-    if (!directions || !directions.routes || !directions.routes.length) return;
+    if (!directions || !directions.routes.length) return;
 
     rotaPolyline = new google.maps.Polyline({
       path: directions.routes[0].overview_path
@@ -212,7 +228,6 @@ function initMap() {
     verificarObstaculosNaRota();
   });
 
-  // AUTOCOMPLETE
   const options = {
     componentRestrictions: { country: "br" },
     fields: ["formatted_address", "geometry"],
@@ -316,6 +331,20 @@ function verificarObstaculosNaRota() {
     });
 
     obstacleMarkers.push(marker);
+
+    const div = document.createElement("div");
+    div.className =
+      "obstaculo-item " + (critico ? "obstaculo-critico" : "obstaculo-ok");
+
+    div.innerHTML = `
+      📍 <b>${o.via || "Via não informada"}</b><br>
+      KM: ${o.km || "-"}<br>
+      Coordenadas: ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br>
+      Altura máx.: ${o.alturaMax.toFixed(2)} m<br>
+      Status: ${critico ? "🚫 CRÍTICO" : "✅ OK"}
+    `;
+
+    resultadoContainer.appendChild(div);
   });
 
   log(`🚧 Obstáculos críticos: ${criticos}`);
