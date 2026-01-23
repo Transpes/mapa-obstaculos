@@ -176,7 +176,6 @@ const CSV_URL =
   ) +
   "&t=" + Date.now();
 
-
 let obstacles = [];
 let map, directionsService, directionsRenderer, rotaPolyline;
 let obstacleMarkers = [];
@@ -334,6 +333,32 @@ function verificarObstaculosNaRota() {
 
     obstacleMarkers.push(marker);
 
+    /* ===== INFO WINDOW (NOVO) ===== */
+    const infoWindow = new google.maps.InfoWindow({
+      content: `
+        <div style="font-size:12px; line-height:1.4">
+          <strong>${o.via || "Via não informada"}</strong><br>
+          KM: ${o.km || "-"}<br>
+          Coordenadas:<br>
+          ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br><br>
+          Altura do obstáculo: <b>${o.alturaMax.toFixed(2)} m</b><br>
+          Altura do caminhão: <b>${altura.toFixed(2)} m</b><br>
+          <b style="color:${critico ? "red" : "green"}">
+            ${critico ? "❌ BLOQUEANTE" : "✅ OK"}
+          </b>
+        </div>
+      `
+    });
+
+    marker.addListener("mouseover", () => {
+      infoWindow.open(map, marker);
+    });
+
+    marker.addListener("mouseout", () => {
+      infoWindow.close();
+    });
+
+    /* ===== LEGENDA ===== */
     const div = document.createElement("div");
     div.className =
       "obstaculo-item " + (critico ? "obstaculo-critico" : "obstaculo-ok");
@@ -361,5 +386,3 @@ function verificarObstaculosNaRota() {
 
 </body>
 </html>
-
-
