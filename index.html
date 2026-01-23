@@ -1,88 +1,110 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>Sistema de Obstáculos Rodoviários</title>
+<meta charset="UTF-8">
+<title>Sistema de Obstáculos Rodoviários</title>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4f4f4;
+}
 
-    header {
-      background: #2c2c2c;
-      color: #fff;
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
+/* ===== TOPO ===== */
+header {
+  background: #2c2c2c;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+header img { height: 32px; }
 
-    header img {
-      height: 32px;
-    }
+/* ===== LAYOUT ===== */
+.container {
+  display: flex;
+  height: calc(100vh - 60px);
+}
 
-    .container {
-      display: flex;
-      height: calc(100vh - 60px);
-    }
+.panel {
+  width: 380px;
+  background: #ffffff;
+  padding: 15px;
+  box-shadow: 2px 0 6px rgba(0,0,0,0.15);
+  overflow-y: auto;
+}
 
-    .panel {
-      width: 360px;
-      background: #ffffff;
-      padding: 15px;
-      box-shadow: 2px 0 6px rgba(0,0,0,0.15);
-      overflow-y: auto;
-    }
+.panel h3 {
+  margin-top: 0;
+  font-size: 15px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 4px;
+}
 
-    .panel h3 {
-      margin-top: 0;
-    }
+.panel label {
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 10px;
+  display: block;
+}
 
-    .panel label {
-      font-size: 13px;
-      font-weight: bold;
-      margin-top: 10px;
-      display: block;
-    }
+.panel input,
+.panel button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px;
+  box-sizing: border-box;
+}
 
-    .panel input,
-    .panel button {
-      width: 100%;
-      margin-top: 5px;
-      padding: 7px;
-      box-sizing: border-box;
-    }
+.panel button {
+  background: #0078d4;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
 
-    .panel button {
-      background: #0078d4;
-      color: #fff;
-      border: none;
-      cursor: pointer;
-      margin-top: 10px;
-    }
+.panel button:hover {
+  background: #005fa3;
+}
 
-    .panel button:hover {
-      background: #005fa3;
-    }
+#status {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: bold;
+}
 
-    #status {
-      margin-top: 10px;
-      font-size: 13px;
-    }
+#log {
+  background: #111;
+  color: #0f0;
+  font-size: 11px;
+  padding: 8px;
+  height: 140px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
 
-    #map {
-      flex: 1;
-    }
+#resultadoContainer {
+  margin-top: 10px;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  border-top: 1px solid #ccc;
+}
 
-    .footer {
-      margin-top: 20px;
-      font-size: 11px;
-      color: #666;
-    }
-  </style>
+#map {
+  flex: 1;
+}
+
+/* ===== FOOTER ===== */
+.footer {
+  margin-top: 15px;
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+}
+</style>
 </head>
 
 <body>
@@ -94,131 +116,199 @@
 
 <div class="container">
 
-  <div class="panel">
-    <h3>Rota</h3>
+<div class="panel">
 
-    <label>Origem</label>
-    <input id="origem" type="text" placeholder="Endereço de origem">
+<h3>1️⃣ Definir rota</h3>
+<label>Origem</label>
+<input id="origem" type="text" placeholder="Endereço de origem">
 
-    <label>Destino</label>
-    <input id="destino" type="text" placeholder="Endereço de destino">
+<label>Destino</label>
+<input id="destino" type="text" placeholder="Endereço de destino">
 
-    <button onclick="calcularRota()">Calcular rota</button>
+<button onclick="calcularRota()">Calcular rota</button>
 
-    <label>Altura do caminhão (m)</label>
-    <input id="altura" type="number" step="0.01" placeholder="Ex: 4.40">
+<h3>2️⃣ Parâmetros do veículo</h3>
+<label>Altura do caminhão (m)</label>
+<input id="alturaCaminhao" type="number" step="0.01" placeholder="Ex: 4.40">
 
-    <button onclick="verificarObstaculos()">Verificar obstáculos</button>
+<h3>3️⃣ Obstáculos</h3>
+<button onclick="carregarPlanilha()">Carregar obstáculos</button>
+<button onclick="verificarObstaculosNaRota()">Verificar obstáculos na rota</button>
 
-    <div id="status">Aguardando...</div>
+<div id="status">Aguardando…</div>
+<div id="log"></div>
 
-    <div class="footer">
-      Desenvolvido por Caio Bertolato Pereira<br>
-      Reportar problemas: seu.email@empresa.com
-    </div>
-  </div>
+<h3>Obstáculos na rota</h3>
+<div id="resultadoContainer"></div>
 
-  <div id="map"></div>
+<div class="footer">
+  Desenvolvido por <b>Caio Bertolato Pereira</b><br>
+  Reportar problemas: seu.email@empresa.com
+</div>
+
+</div>
+
+<div id="map"></div>
 </div>
 
 <script>
-  let map;
-  let directionsService;
-  let directionsRenderer;
+const CSV_URL =
+  "https://corsproxy.io/?" +
+  encodeURIComponent(
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vSmLH9trIDCxy9l_OsUyoHjld5rhAZgYVesTzQu8TGxpuoIRMSLkwwgE-ln1Ux3exuQIIquyzuBb-y3/pub?gid=1651169068&single=true&output=csv"
+  );
 
-  /* ================= MAPA ================= */
-  function initMap() {
-    map = new google.maps.Map(document.getElementById("map"), {
-      center: { lat: -19.5, lng: -44.0 },
-      zoom: 6
+let obstacles = [];
+let map, directionsService, directionsRenderer, rotaPolyline;
+let obstacleMarkers = [];
+
+/* ===== UTIL ===== */
+function log(msg) {
+  document.getElementById("log").innerHTML += "▶ " + msg + "<br>";
+}
+function setStatus(msg) {
+  document.getElementById("status").innerText = msg;
+}
+
+/* ===== CSV ===== */
+function parseCSVLine(line) {
+  const result = [];
+  let current = "";
+  let insideQuotes = false;
+
+  for (let c of line) {
+    if (c === '"') insideQuotes = !insideQuotes;
+    else if (c === "," && !insideQuotes) {
+      result.push(current); current = "";
+    } else current += c;
+  }
+  result.push(current);
+  return result.map(v => v.replace(/^"|"$/g,"").trim());
+}
+
+/* ===== MAPA ===== */
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: -19.5, lng: -44.0 },
+    zoom: 6
+  });
+
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({
+    draggable: true
+  });
+  directionsRenderer.setMap(map);
+
+  directionsRenderer.addListener("directions_changed", () => {
+    log("↪ Rota alterada manualmente");
+    verificarObstaculosNaRota();
+  });
+
+  const options = {
+    componentRestrictions: { country: "br" },
+    fields: ["formatted_address", "geometry"],
+    types: ["geocode"]
+  };
+
+  new google.maps.places.Autocomplete(origem, options);
+  new google.maps.places.Autocomplete(destino, options);
+}
+
+/* ===== PLANILHA ===== */
+async function carregarPlanilha() {
+  obstacles = [];
+  log("Iniciando download do CSV");
+  setStatus("Carregando planilha...");
+
+  const resp = await fetch(CSV_URL);
+  const csv = await resp.text();
+  const linhas = csv.split("\n");
+
+  let validos = 0;
+
+  for (let i = 1; i < linhas.length; i++) {
+    const c = parseCSVLine(linhas[i]);
+    if (c.length < 8) continue;
+
+    const alturas = [c[4],c[5],c[6]]
+      .map(v => parseFloat(v.replace(",", ".")))
+      .filter(v => !isNaN(v));
+
+    if (!alturas.length) continue;
+
+    const [lat,lng] = c[7].split(",").map(Number);
+    if (isNaN(lat) || isNaN(lng)) continue;
+
+    obstacles.push({
+      via: c[0],
+      km: c[2],
+      lat, lng,
+      alturaMax: Math.max(...alturas)
     });
-
-    directionsService = new google.maps.DirectionsService();
-
-    directionsRenderer = new google.maps.DirectionsRenderer({
-      preserveViewport: false,
-      draggable: true
-    });
-
-    directionsRenderer.setMap(map);
-
-    // Recalcular quando arrastar rota
-    directionsRenderer.addListener("directions_changed", () => {
-      document.getElementById("status").innerText =
-        "Rota alterada manualmente. Recalcule os obstáculos.";
-    });
-
-    // AUTOCOMPLETE
-    const options = {
-      componentRestrictions: { country: "br" },
-      fields: ["formatted_address", "geometry"],
-      types: ["geocode"]
-    };
-
-    new google.maps.places.Autocomplete(
-      document.getElementById("origem"),
-      options
-    );
-
-    new google.maps.places.Autocomplete(
-      document.getElementById("destino"),
-      options
-    );
+    validos++;
   }
 
-  /* ================= ROTA ================= */
-  function calcularRota() {
-    const origem = document.getElementById("origem").value;
-    const destino = document.getElementById("destino").value;
+  log(`✔ Obstáculos carregados: ${validos}`);
+  setStatus("Planilha carregada");
+}
 
-    if (!origem || !destino) {
-      alert("Informe origem e destino");
-      return;
-    }
+/* ===== ROTA ===== */
+function calcularRota() {
+  directionsService.route({
+    origin: origem.value,
+    destination: destino.value,
+    travelMode: "DRIVING"
+  }, (res, status) => {
+    if (status !== "OK") return;
+    directionsRenderer.setDirections(res);
+    rotaPolyline = new google.maps.Polyline({
+      path: res.routes[0].overview_path
+    });
+    log("🛣️ Rota calculada");
+  });
+}
 
-    directionsService.route(
-      {
-        origin: origem,
-        destination: destino,
-        travelMode: google.maps.TravelMode.DRIVING
-      },
-      (result, status) => {
-        if (status === "OK") {
-          directionsRenderer.setDirections(result);
-          document.getElementById("status").innerText =
-            "Rota calculada. Verifique os obstáculos.";
-        } else {
-          alert("Erro ao calcular rota: " + status);
-        }
-      }
+/* ===== VERIFICAÇÃO ===== */
+function verificarObstaculosNaRota() {
+  if (!rotaPolyline) return;
+  const altura = parseFloat(alturaCaminhao.value);
+  if (isNaN(altura)) return alert("Informe a altura");
+
+  obstacleMarkers.forEach(m => m.setMap(null));
+  obstacleMarkers = [];
+  resultadoContainer.innerHTML = "";
+
+  let criticos = 0;
+
+  obstacles.forEach(o => {
+    const pos = new google.maps.LatLng(o.lat,o.lng);
+    const perto = google.maps.geometry.poly.isLocationOnEdge(
+      pos, rotaPolyline, 0.001
     );
-  }
+    if (!perto) return;
 
-  /* ================= OBSTÁCULOS ================= */
-  function verificarObstaculos() {
-    const altura = parseFloat(document.getElementById("altura").value);
+    const critico = o.alturaMax < altura;
+    if (critico) criticos++;
 
-    if (isNaN(altura)) {
-      alert("Informe a altura do caminhão");
-      return;
-    }
+    const marker = new google.maps.Marker({
+      map, position: pos,
+      icon: critico
+        ? "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
+        : "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+    });
 
-    // Aqui entra sua lógica atual de:
-    // - leitura do CSV / Google Sheets
-    // - cálculo de distância à rota
-    // - comparação de altura
+    obstacleMarkers.push(marker);
+  });
 
-    document.getElementById("status").innerText =
-      "Obstáculos verificados (simulação).";
-  }
+  log(`🚧 Obstáculos críticos: ${criticos}`);
+  setStatus("Verificação concluída");
+}
 </script>
 
 <script
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4&libraries=places,geometry&callback=initMap"
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4&libraries=geometry,places&callback=initMap"
   async defer>
 </script>
 
 </body>
 </html>
-
-
