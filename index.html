@@ -200,8 +200,18 @@ function initMap() {
   directionsRenderer.setMap(map);
 
   directionsRenderer.addListener("directions_changed", () => {
-    log("↪ Rota alterada manualmente");
-    verificarObstaculosNaRota();
+  const directions = directionsRenderer.getDirections();
+  if (!directions || !directions.routes || !directions.routes.length) return;
+
+  // 🔹 RECRIA a polyline com a rota atual arrastada
+  rotaPolyline = new google.maps.Polyline({
+    path: directions.routes[0].overview_path
+  });
+
+  log("↪ Rota alterada manualmente – recalculando obstáculos");
+  verificarObstaculosNaRota();
+});
+
   });
 
   const options = {
@@ -321,3 +331,4 @@ function verificarObstaculosNaRota() {
 
 </body>
 </html>
+
