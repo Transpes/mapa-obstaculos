@@ -267,7 +267,7 @@ async function carregarPlanilha() {
   lat,
   lng,
   alturas: alturas,              // ← guarda as 3 medidas
-  alturaMax: Math.max(...alturas)
+  alturaMin: Math.min(...alturas)
 });
 
 
@@ -320,7 +320,7 @@ function verificarObstaculosNaRota() {
 
     if (!perto) return;
 
-    const critico = o.alturaMax < altura;
+    const critico = o.alturaMin < altura;
     if (critico) criticos++;
 
     const marker = new google.maps.Marker({
@@ -347,7 +347,7 @@ function verificarObstaculosNaRota() {
       <br><br>
 
       Altura do caminhão: <b>${altura.toFixed(2)} m</b><br>
-      Altura considerada (máx): <b>${o.alturaMax.toFixed(2)} m</b><br>
+      Altura considerada (min): <b>${o.alturaMin.toFixed(2)} m</b><br>
 
       <b style="color:${critico ? "red" : "green"}">
         ${critico ? "❌ BLOQUEANTE" : "✅ OK"}
@@ -374,7 +374,7 @@ function verificarObstaculosNaRota() {
       📍 <b>${o.via || "Via não informada"}</b><br>
       KM: ${o.km || "-"}<br>
       Coordenadas: ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br>
-      Altura máx.: ${o.alturaMax.toFixed(2)} m<br>
+      Altura min.: ${o.alturaMin.toFixed(2)} m<br>
       Status: ${critico ? "🚫 CRÍTICO" : "✅ OK"}
     `;
 
@@ -393,6 +393,7 @@ function verificarObstaculosNaRota() {
 
 </body>
 </html>
+
 
 
 
