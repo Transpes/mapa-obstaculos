@@ -172,7 +172,11 @@ header img { height: 64px; }
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vSmLH9trIDCxy9l_OsUyoHjld5rhAZgYVesTzQu8TGxpuoIRMSLkwwgE-ln1Ux3exuQIIquyzuBb-y3/pub?output=csv"
   + "&t=" + Date.now();
-
+  
+const CSV_URL_2 =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSjaCB7K-3Zz9YY4XhIX6sPCqqywoHdZkdz0VPSGyf0_a2C8Zq0Xplzwb7Frh8L--AqFBYJX-MTqxAr/pub?output=csv"
+  + "&t=" + Date.now();
+  
 let obstacles = [];
 let map, directionsService, directionsRenderer, rotaPolyline;
 let obstacleMarkers = [];
@@ -199,6 +203,35 @@ function parseCSVLine(line) {
   }
   result.push(current);
   return result.map(v => v.replace(/^"|"$/g,"").trim());
+}
+
+
+/* ===== NOVA FUNÇÃO ===== */
+function processarCSV(csv) {
+  const linhas = csv.split("\n");
+
+  for (let i = 1; i < linhas.length; i++) {
+    const c = parseCSVLine(linhas[i]);
+    if (c.length < 8) continue;
+
+    const alturas = [c[4], c[5], c[6]]
+      .map(v => parseFloat(v.replace(",", ".")))
+      .filter(v => !isNaN(v));
+
+    if (!alturas.length) continue;
+
+    const [lat, lng] = c[7].split(",").map(Number);
+    if (isNaN(lat) || isNaN(lng)) continue;
+
+    obstacles.push({
+      via: c[0],
+      km: c[2],
+      lat,
+      lng,
+      alturas: alturas,
+      alturaMin: Math.min(...alturas)
+    });
+  }
 }
 
 /* ===== MAPA ===== */
@@ -239,43 +272,35 @@ function initMap() {
 /* ===== PLANILHA ===== */
 async function carregarPlanilha() {
   obstacles = [];
-  log("Iniciando download do CSV");
-  setStatus("Carregando planilha...");
+  log("Iniciando download das planilhas...");
+  setStatus("Carregando planilhas...");
 
-  const resp = await fetch(CSV_URL);
-  const csv = await resp.text();
-  const linhas = csv.split("\n");
+  try {
+    const [resp1, resp2] = await Promise.all([
+      fetch(CSV_URL),
+      fetch(CSV_URL_2)
+    ]);
 
-  let validos = 0;
+    const csv1 = await resp1.text();
+    const csv2 = await resp2.text();
 
-  for (let i = 1; i < linhas.length; i++) {
-    const c = parseCSVLine(linhas[i]);
-    if (c.length < 8) continue;
+    processarCSV(csv1);
+    processarCSV(csv2);
 
-    const alturas = [c[4], c[5], c[6]]
-      .map(v => parseFloat(v.replace(",", ".")))
-      .filter(v => !isNaN(v));
+    // Remove duplicados
+    obstacles = Array.from(
+      new Map(
+        obstacles.map(o => [`${o.lat}_${o.lng}`, o])
+      ).values()
+    );
 
-    if (!alturas.length) continue;
+    log(`✔ Total de obstáculos: ${obstacles.length}`);
+    setStatus("Planilhas carregadas");
 
-    const [lat, lng] = c[7].split(",").map(Number);
-    if (isNaN(lat) || isNaN(lng)) continue;
-
-    obstacles.push({
-  via: c[0],
-  km: c[2],
-  lat,
-  lng,
-  alturas: alturas,              // ← guarda as 3 medidas
-  alturaMin: Math.min(...alturas)
-});
-
-
-    validos++;
+  } catch (erro) {
+    console.error(erro);
+    setStatus("Erro ao carregar planilhas");
   }
-
-  log(`✔ Obstáculos carregados: ${validos}`);
-  setStatus("Planilha carregada");
 }
 
 /* ===== ROTA ===== */
