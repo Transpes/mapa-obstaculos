@@ -387,6 +387,7 @@ function normalizarRegistroBase1(obj) {
   const descricao = pegarCampo(obj, ["descricao", "descrição"]) || "";
   const obs = pegarCampo(obj, ["obs", "observacao", "observação"]) || "";
   const dataAfericao = pegarCampo(obj, ["data_da_afericao", "data_afericao", "data"]) || "";
+  const fonte = pegarCampo(obj, ["fonte", "evg", "arquivo_evg", "imagem_evg", "arquivo"]) || "";
 
   const { lat, lng } = extrairCoordenadasDaLinha(obj);
   const alturas = extrairAlturasDaLinha(obj);
@@ -403,16 +404,19 @@ function normalizarRegistroBase1(obj) {
     descricao,
     obs,
     data: dataAfericao,
+    fonte,
     lat,
     lng,
     alturas,
     alturaMin: Math.min(...alturas)
+    
   };
 }
 
 function normalizarRegistroBase2(obj) {
   const dataHora = pegarCampo(obj, ["data_hora", "datahora", "data"]) || "";
   const observacao = pegarCampo(obj, ["observacao", "observacao_livre", "obs"]) || "";
+  const fonte = pegarCampo(obj, ["fonte", "evg", "arquivo_evg", "imagem_evg", "arquivo"]) || "";
 
   const { lat, lng } = extrairCoordenadasDaLinha(obj);
   const alturas = extrairAlturasDaLinha(obj);
@@ -429,10 +433,12 @@ function normalizarRegistroBase2(obj) {
     descricao: "Ponto alimentado pelo formulário",
     obs: observacao,
     data: dataHora,
+    fonte,
     lat,
     lng,
     alturas,
     alturaMin: Math.min(...alturas)
+
   };
 }
 
@@ -686,32 +692,34 @@ function verificarObstaculosNaRota() {
     obstacleMarkers.push(marker);
 
     const infoWindow = new google.maps.InfoWindow({
-      content: `
-        <div style="font-size:12px; line-height:1.45; min-width:220px">
-          <strong>${o.via || "Via não informada"}</strong><br>
-          <span style="color:#666">${o.origemBase || "-"}</span><br>
-          ${o.origemDetalhe ? `<span style="color:#666">${o.origemDetalhe}</span><br>` : ""}
-          ${o.uf ? `UF: <b>${o.uf}</b><br>` : ""}
-          ${o.km ? `KM: <b>${o.km}</b><br>` : ""}
-          ${o.descricao ? `Descrição: <b>${o.descricao}</b><br>` : ""}
-          ${o.data ? `Data: <b>${o.data}</b><br>` : ""}
-          <br>
-          Coordenadas:<br>
-          <b>${o.lat.toFixed(6)}, ${o.lng.toFixed(6)}</b><br><br>
+  content: `
+    <div style="font-size:12px; line-height:1.45; min-width:220px">
+      <strong>${o.via || "Via não informada"}</strong><br>
+      <span style="color:#666">${o.origemBase || "-"}</span><br>
+      ${o.origemDetalhe ? `<span style="color:#666">${o.origemDetalhe}</span><br>` : ""}
+      ${o.fonte ? `Fonte: <b>${o.fonte}</b><br>` : ""}
+      ${o.uf ? `UF: <b>${o.uf}</b><br>` : ""}
+      ${o.km ? `KM: <b>${o.km}</b><br>` : ""}
+      ${o.descricao ? `Descrição: <b>${o.descricao}</b><br>` : ""}
+      ${o.data ? `Data: <b>${o.data}</b><br>` : ""}
+      ${o.obs ? `Obs.: <b>${o.obs}</b><br>` : ""}
+      <br>
+      Coordenadas:<br>
+      <b>${o.lat.toFixed(6)}, ${o.lng.toFixed(6)}</b><br><br>
 
-          <u>Alturas registradas</u><br>
-          ${o.alturas.map((h, i) => `Altura ${i + 1}: ${h.toFixed(2)} m`).join("<br>")}
-          <br><br>
+      <u>Alturas registradas</u><br>
+      ${o.alturas.map((h, i) => `Altura ${i + 1}: ${h.toFixed(2)} m`).join("<br>")}
+      <br><br>
 
-          Altura do caminhão: <b>${altura.toFixed(2)} m</b><br>
-          Altura considerada (mínima): <b>${o.alturaMin.toFixed(2)} m</b><br>
+      Altura do caminhão: <b>${altura.toFixed(2)} m</b><br>
+      Altura considerada (mínima): <b>${o.alturaMin.toFixed(2)} m</b><br>
 
-          <b style="color:${critico ? "red" : "green"}">
-            ${critico ? "❌ BLOQUEANTE" : "✅ OK"}
-          </b>
-        </div>
-      `
-    });
+      <b style="color:${critico ? "red" : "green"}">
+        ${critico ? "❌ BLOQUEANTE" : "✅ OK"}
+      </b>
+    </div>
+  `
+});
 
     marker.addListener("mouseover", () => {
       infoWindow.open(map, marker);
@@ -727,13 +735,15 @@ function verificarObstaculosNaRota() {
     div.innerHTML = `
       📍 <b>${o.via || "Via não informada"}</b><br>
       ${o.origemBase ? `Base: ${o.origemBase}<br>` : ""}
+      ${o.fonte ? `Fonte: ${o.fonte}<br>` : ""}
       ${o.uf ? `UF: ${o.uf}<br>` : ""}
       ${o.km ? `KM: ${o.km}<br>` : ""}
       ${o.descricao ? `Descrição: ${o.descricao}<br>` : ""}
+      ${o.obs ? `Obs.: ${o.obs}<br>` : ""}
       Coordenadas: ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br>
       Altura min.: ${o.alturaMin.toFixed(2)} m<br>
       Status: ${critico ? "🚫 CRÍTICO" : "✅ OK"}
-    `;
+`;
 
     $("resultadoContainer").appendChild(div);
   });
