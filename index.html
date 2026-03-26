@@ -265,7 +265,18 @@ function coordenadasValidas(lat, lng) {
          lng >= -180 &&
          lng <= 180;
 }
+function corrigirCoordenadasBrasil(lat, lng) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { lat, lng };
+  }
 
+  // Corrige automaticamente para hemisfério sul/oeste (Brasil)
+  if (lat > 0) lat = -lat;
+  if (lng > 0) lng = -lng;
+
+  return { lat, lng };
+}
+  
 /* =========================================================
    CSV: PARSER DE LINHA
    ========================================================= */
@@ -343,18 +354,26 @@ function extrairCoordenadasDaLinha(obj) {
   if (latTxt && lngTxt) {
     const lat = parseNumeroFlex(latTxt);
     const lng = parseNumeroFlex(lngTxt);
-    return { lat, lng };
+    
+    const corrigido = corrigirCoordenadasBrasil(lat, lng);
+    return corrigido;
+    
   }
 
   const coordenadasTxt = pegarCampo(obj, ["coordenadas", "coordenada", "coord", "coords"]);
   if (coordenadasTxt) {
-    const partes = coordenadasTxt.split(",");
-    if (partes.length >= 2) {
-      const lat = parseNumeroFlex(partes[0]);
-      const lng = parseNumeroFlex(partes[1]);
-      return { lat, lng };
-    }
+  const partes = coordenadasTxt
+    .replace(/\s+/g, "")
+    .split(/[,;]/);
+
+  if (partes.length >= 2) {
+    const lat = parseNumeroFlex(partes[0]);
+    const lng = parseNumeroFlex(partes[1]);
+
+    const corrigido = corrigirCoordenadasBrasil(lat, lng);
+    return corrigido;
   }
+}
 
   return { lat: NaN, lng: NaN };
 }
@@ -652,7 +671,7 @@ function verificarObstaculosNaRota() {
     return;
   }
 
-  const altura = parseFloat($("alturaCaminhao").value);
+  const altura = parseNumeroFlex($("alturaCaminhao").value);
   if (isNaN(altura)) {
     alert("Informe a altura do caminhão.");
     return;
