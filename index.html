@@ -525,7 +525,7 @@ function gerarLinkCompartilhavel() {
 
   const path = rotaPolyline.getPath().getArray();
 
-  const coords = path.map(p => [p.lat(), p.lng()]);
+  const encodedPath = google.maps.geometry.encoding.encodePath(path);
 
   const dados = {
     origem: $("origem").value,
@@ -554,8 +554,8 @@ function carregarRotaDaURL() {
     $("origem").value = dados.origem || "";
     $("destino").value = dados.destino || "";
 
-    const path = (dados.path || []).map(p =>
-      new google.maps.LatLng(p[0], p[1])
+    const path = google.maps.geometry.encoding.decodePath(dados.path);
+    
     );
 
     rotaPolyline = new google.maps.Polyline({
