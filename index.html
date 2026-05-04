@@ -398,7 +398,7 @@ input::placeholder { color: var(--muted); }
         <input id="origem" type="text" placeholder="Endereço de origem">
         <label>Destino</label>
         <input id="destino" type="text" placeholder="Endereço de destino">
-        <button class="btn btn-primary" onclick="calcularRota()">
+        <button id="btnCalcular" class="btn btn-primary" onclick="calcularRota()">
           🛣️ Calcular rota
         </button>
       </div>
@@ -408,7 +408,7 @@ input::placeholder { color: var(--muted); }
         <div class="section-title">② Parâmetros do veículo</div>
         <label>Altura do caminhão (m)</label>
         <input id="alturaCaminhao" type="number" step="0.01" placeholder="Ex: 4.40">
-        <button class="btn btn-secondary" onclick="verificarObstaculosNaRota()">
+        <button id="btnVerificar" class="btn btn-secondary" onclick="verificarObstaculosNaRota()">
           🔍 Verificar obstáculos na rota
         </button>
       </div>
@@ -472,6 +472,8 @@ const CSV_URL_2 =
 
 const GOOGLE_MAPS_KEY = "AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4";
 const STATIC_MAPS_KEY = "AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4";
+const MAX_WAYPOINTS_PER_REQUEST = 8;
+const OBSTACLE_DISTANCE_METERS = 120;
 
 /* =========================================================
    ESTADO
@@ -489,15 +491,71 @@ let obstaculosNaRota = [];
    ========================================================= */
 function $(id) { return document.getElementById(id); }
 
+function formatTime() {
+  return new Date().toLocaleTimeString("pt-BR", { hour12: false });
+}
+
 function log(msg) {
-  $("log").innerHTML += "▶ " + msg + "<br>";
-  $("log").scrollTop = $("log").scrollHeight;
+  const logArea = $("log");
+  logArea.innerHTML += `▶ [${formatTime()}] ${msg}<br>`;
+  logArea.scrollTop = logArea.scrollHeight;
 }
 
 function setStatus(msg, tipo = "ok") {
   $("status").innerText = msg;
   const dot = $("statusDot");
   dot.className = "status-dot " + tipo;
+}
+
+function setLoadingState(loading) {
+  carregamentoEmAndamento = loading;
+  updateActionButtons();
+}
+
+function updateActionButtons() {
+  const hasRoute = Boolean(rotaAtual?.routes?.length);
+  const hasPath = Boolean(rotaPolyline?.getPath?.()?.getLength());
+  const enabled = !carregamentoEmAndamento;
+
+  const setButton = (id, allow) => {
+    const button = $(id);
+    if (button) button.disabled = !allow;
+  };
+
+  setButton("btnCalcular", enabled);
+  setButton("btnVerificar", enabled && basesCarregadas && hasPath);
+  setButton("btnCompartilhar", enabled && hasRoute);
+  setButton("btnPDF", enabled && hasRoute);
+}
+
+function onEnter(action) {
+  return event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      action();
+    }
+  };
+}
+
+function decodeBase64Utf8(value) {
+  try {
+    const text = atob(value);
+    return decodeURIComponent(Array.from(text, char => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
+  } catch {
+    return null;
+  }
+}
+
+function requestRoute(options) {
+  return new Promise((resolve, reject) => {
+    directionsService.route(options, (res, status) => {
+      if (status === "OK" && res?.routes?.length) {
+        resolve(res);
+      } else {
+        reject(new Error(status || "Erro ao buscar rota"));
+      }
+    });
+  });
 }
 
 function normalizarTexto(texto) {
@@ -678,9 +736,14 @@ function initMap() {
     const directions = directionsRenderer.getDirections();
     if (!directions?.routes?.length) return;
     rotaAtual = directions;
+    if (rotaPolyline) rotaPolyline.setMap(null);
     rotaPolyline = new google.maps.Polyline({ path: directions.routes[0].overview_path });
     log("↪ Rota alterada — recalculando obstáculos");
-    verificarObstaculosNaRota();
+    if (parseNumeroFlex($("alturaCaminhao").value) > 0) {
+      verificarObstaculosNaRota(true);
+    } else {
+      updateActionButtons();
+    }
   });
 
   const opts = {
@@ -691,6 +754,11 @@ function initMap() {
   new google.maps.places.Autocomplete($("origem"), opts);
   new google.maps.places.Autocomplete($("destino"), opts);
 
+  $("origem").addEventListener("keydown", onEnter(calcularRota));
+  $("destino").addEventListener("keydown", onEnter(calcularRota));
+  $("alturaCaminhao").addEventListener("keydown", onEnter(verificarObstaculosNaRota));
+
+  updateActionButtons();
   log("Mapa inicializado");
   setStatus("Carregando bases...", "loading");
   carregarTodasAsBases();
@@ -700,7 +768,7 @@ function initMap() {
    BASES
    ========================================================= */
 async function carregarTodasAsBases() {
-  carregamentoEmAndamento = true;
+  setLoadingState(true);
   basesCarregadas = false;
   obstacles = [];
 
@@ -723,43 +791,52 @@ async function carregarTodasAsBases() {
     log(`✔ Total consolidado: ${obstacles.length}`);
     basesCarregadas = true;
     setStatus("Bases carregadas · Sistema pronto", "ok");
-    restaurarRotaDaURL(); // tenta restaurar rota do link após bases prontas
+    updateActionButtons();
+    await restaurarRotaDaURL(); // tenta restaurar rota do link após bases prontas
 
   } catch (erro) {
     basesCarregadas = false;
     setStatus("Erro ao carregar bases", "error");
     log("❌ " + String(erro?.message || erro));
   } finally {
-    carregamentoEmAndamento = false;
+    setLoadingState(false);
   }
 }
 
 /* =========================================================
    ROTA
    ========================================================= */
-function calcularRota() {
+async function calcularRota() {
   const origemTxt = $("origem").value.trim();
   const destinoTxt = $("destino").value.trim();
   if (!origemTxt || !destinoTxt) { alert("Preencha origem e destino."); return; }
 
   setStatus("Calculando rota...", "loading");
+  setLoadingState(true);
 
-  directionsService.route({
-    origin: origemTxt,
-    destination: destinoTxt,
-    travelMode: "DRIVING"
-  }, (res, status) => {
-    if (status !== "OK") {
-      log("❌ Rota não encontrada: " + status);
-      setStatus("Erro ao calcular rota", "error");
-      return;
-    }
+  try {
+    const res = await requestRoute({
+      origin: origemTxt,
+      destination: destinoTxt,
+      travelMode: "DRIVING"
+    });
+
     directionsRenderer.setDirections(res);
     rotaAtual = res;
+    if (rotaPolyline) rotaPolyline.setMap(null);
     rotaPolyline = new google.maps.Polyline({ path: res.routes[0].overview_path });
+
     log("🛣️ Rota calculada");
     setStatus("Rota calculada", "ok");
-  });
+    if (parseNumeroFlex($("alturaCaminhao").value) > 0) {
+      verificarObstaculosNaRota(true);
+    }
+  } catch (erro) {
+    log("❌ Rota não encontrada: " + String(erro?.message || erro));
+    setStatus("Erro ao calcular rota", "error");
+  } finally {
+    setLoadingState(false);
+  }
 }
 
 /* =========================================================
@@ -770,23 +847,39 @@ function limparMarcadores() {
   obstacleMarkers = [];
 }
 
-function verificarObstaculosNaRota() {
-  if (carregamentoEmAndamento) { alert("Aguarde o carregamento das bases."); return; }
-  if (!basesCarregadas) { alert("Bases não carregadas."); return; }
-  if (!rotaPolyline) { alert("Calcule a rota primeiro."); return; }
+function estaPertoDaRota(lat, lng) {
+  if (!rotaPolyline) return false;
+  const pos = new google.maps.LatLng(lat, lng);
+  const tolerancia = OBSTACLE_DISTANCE_METERS / 111000;
+  return google.maps.geometry.poly.isLocationOnEdge(pos, rotaPolyline, tolerancia);
+}
+
+function verificarObstaculosNaRota(skipAlert = false) {
+  if (carregamentoEmAndamento) {
+    if (!skipAlert) alert("Aguarde o carregamento das bases.");
+    return;
+  }
+  if (!basesCarregadas) {
+    if (!skipAlert) alert("Bases não carregadas.");
+    return;
+  }
+  if (!rotaPolyline) {
+    if (!skipAlert) alert("Calcule a rota primeiro.");
+    return;
+  }
 
   const altura = parseNumeroFlex($("alturaCaminhao").value);
-  if (isNaN(altura)) { alert("Informe a altura do caminhão."); return; }
+  if (isNaN(altura)) {
+    if (!skipAlert) alert("Informe a altura do caminhão.");
+    return;
+  }
 
   limparMarcadores();
   $("resultadoContainer").innerHTML = "";
   obstaculosNaRota = [];
 
   obstacles.forEach(o => {
-    const pos = new google.maps.LatLng(o.lat, o.lng);
-    const perto = google.maps.geometry.poly.isLocationOnEdge(pos, rotaPolyline, 0.01);
-    if (!perto) return;
-
+    if (!estaPertoDaRota(o.lat, o.lng)) return;
     obstaculosNaRota.push({ ...o, critico: o.alturaMin < altura });
   });
 
@@ -799,7 +892,8 @@ function verificarObstaculosNaRota() {
   obstaculosNaRota.forEach(o => {
     const pos = new google.maps.LatLng(o.lat, o.lng);
     const marker = new google.maps.Marker({
-      map, position: pos,
+      map,
+      position: pos,
       icon: o.critico
         ? "http://maps.google.com/mapfiles/ms/icons/red-dot.png"
         : "http://maps.google.com/mapfiles/ms/icons/green-dot.png",
@@ -819,7 +913,7 @@ function verificarObstaculosNaRota() {
           ${o.obs ? `Obs.: ${o.obs}<br>` : ""}
           <br>
           ${o.alturas.map((h, i) => `Altura ${i+1}: ${h.toFixed(2)} m`).join("<br>")}<br><br>
-          Caminhão: <b>${parseNumeroFlex($("alturaCaminhao").value).toFixed(2)} m</b><br>
+          Caminhão: <b>${altura.toFixed(2)} m</b><br>
           Mín. registrada: <b>${o.alturaMin.toFixed(2)} m</b><br>
           <b style="color:${o.critico ? 'red' : 'green'}">${o.critico ? "❌ BLOQUEANTE" : "✅ OK"}</b>
         </div>`
@@ -842,6 +936,7 @@ function verificarObstaculosNaRota() {
 
   log(`📍 Obstáculos na rota: ${obstaculosNaRota.length} (${criticos} críticos)`);
   setStatus(`Verificação concluída · ${criticos} crítico(s)`, criticos > 0 ? "error" : "ok");
+  updateActionButtons();
 }
 
 /* =========================================================
@@ -916,6 +1011,8 @@ function copiarLink() {
     const btn = document.querySelector(".copy-btn");
     btn.innerText = "✅ Copiado!";
     setTimeout(() => { btn.innerText = "📋 Copiar link"; }, 2000);
+  }).catch(() => {
+    prompt("Copie o link abaixo:", url);
   });
 }
 
@@ -932,59 +1029,132 @@ function copiarLink() {
    bem rotas com 1-3 desvios. Para rotas muito alteradas,
    distribuímos os pontos em até 3 lotes sequenciais.
    ========================================================= */
-function restaurarRotaDaURL() {
+async function restaurarRotaDaURL() {
   const urlParams = new URLSearchParams(window.location.search);
-  const r = urlParams.get('r');
+  const r = urlParams.get("r");
   if (!r) return;
 
   try {
-    const json = decodeURIComponent(escape(atob(r)));
+    const json = decodeBase64Utf8(r);
+    if (!json) throw new Error("Link inválido");
     const estado = JSON.parse(json);
     const { origem, destino, altura, pontos = [] } = estado;
 
-    $("origem").value         = origem  || "";
-    $("destino").value        = destino || "";
-    $("alturaCaminhao").value = altura  || "";
+    $("origem").value = origem || "";
+    $("destino").value = destino || "";
+    $("alturaCaminhao").value = altura || "";
 
     if (!origem || !destino) return;
 
     setStatus("Restaurando rota do link...", "loading");
+    setLoadingState(true);
     log(`🔁 Restaurando rota (${pontos.length} pontos)...`);
 
-    executarRotaComWaypoints(origem, destino, pontos);
+    await restaurarRota(origem, destino, pontos);
   } catch (e) {
     log("❌ Erro ao restaurar rota da URL: " + e.message);
     setStatus("Erro ao restaurar rota", "error");
+  } finally {
+    setLoadingState(false);
+  }
+}
+
+async function restaurarRota(origem, destino, pontos) {
+  if (!Array.isArray(pontos) || pontos.length === 0) {
+    return calcularRota();
+  }
+
+  const batches = [];
+  for (let i = 0; i < pontos.length; i += MAX_WAYPOINTS_PER_REQUEST) {
+    batches.push(pontos.slice(i, i + MAX_WAYPOINTS_PER_REQUEST));
+  }
+
+  let currentOrigin = origem;
+  let combinedPath = [];
+  let lastDirections = null;
+
+  for (let index = 0; index < batches.length; index += 1) {
+    const batch = batches[index];
+    const isLastBatch = index === batches.length - 1;
+    const destination = isLastBatch
+      ? destino
+      : { lat: batch[batch.length - 1][0], lng: batch[batch.length - 1][1] };
+
+    const waypoints = isLastBatch
+      ? batch.map(([lat, lng]) => ({ location: { lat, lng }, stopover: false }))
+      : batch.slice(0, -1).map(([lat, lng]) => ({ location: { lat, lng }, stopover: false }));
+
+    const res = await requestRoute({
+      origin: currentOrigin,
+      destination,
+      travelMode: "DRIVING",
+      waypoints,
+      optimizeWaypoints: false
+    });
+
+    const path = res.routes[0].overview_path || [];
+    if (combinedPath.length && path.length) {
+      const lastPoint = combinedPath[combinedPath.length - 1];
+      if (lastPoint.lat() === path[0].lat() && lastPoint.lng() === path[0].lng()) {
+        path.shift();
+      }
+    }
+
+    combinedPath = combinedPath.concat(path);
+    currentOrigin = destination;
+    lastDirections = res;
+  }
+
+  if (!lastDirections) {
+    throw new Error("Não foi possível restaurar a rota");
+  }
+
+  directionsRenderer.setDirections(lastDirections);
+  rotaAtual = lastDirections;
+
+  if (rotaPolyline) rotaPolyline.setMap(null);
+  rotaPolyline = new google.maps.Polyline({ path: combinedPath });
+
+  log("🛣️ Rota restaurada a partir do link");
+  setStatus("Rota restaurada", "ok");
+  updateActionButtons();
+
+  if (parseNumeroFlex($("alturaCaminhao").value) > 0) {
+    verificarObstaculosNaRota(true);
   }
 }
 
 /* =========================================================
    GERAR MAPA ESTÁTICO
    ========================================================= */
-async function gerarMapaEstatico(origem, destino, obstaculosParaPDF, altura) {
-  // Marcadores: até 10 obstáculos críticos em vermelho, resto em verde
+async function gerarMapaEstatico(origem, destino, obstaculosParaPDF) {
   const criticos = obstaculosParaPDF.filter(o => o.critico).slice(0, 8);
-  const seguros  = obstaculosParaPDF.filter(o => !o.critico).slice(0, 5);
+  const seguros = obstaculosParaPDF.filter(o => !o.critico).slice(0, 5);
 
-  let markers = "";
+  const originMarker = origem ? `&markers=color:blue|label:S|${encodeURIComponent(origem)}` : "";
+  const destinationMarker = destino ? `&markers=color:blue|label:F|${encodeURIComponent(destino)}` : "";
 
+  let obstaclesMarkers = "";
   if (criticos.length) {
     const pins = criticos.map(o => `${o.lat.toFixed(5)},${o.lng.toFixed(5)}`).join("|");
-    markers += `&markers=color:red|size:small|${pins}`;
+    obstaclesMarkers += `&markers=color:red|size:small|${pins}`;
   }
   if (seguros.length) {
     const pins = seguros.map(o => `${o.lat.toFixed(5)},${o.lng.toFixed(5)}`).join("|");
-    markers += `&markers=color:green|size:small|${pins}`;
+    obstaclesMarkers += `&markers=color:green|size:small|${pins}`;
   }
 
-  const path = `&path=color:0xf5a623ff|weight:3|enc:${await getEncodedPath()}`;
+  const encodedPath = await getEncodedPath();
+  const path = encodedPath ? `&path=color:0xf5a623ff|weight:3|enc:${encodeURIComponent(encodedPath)}` : "";
 
-  // Fallback: se não tem path encodado, usa só marcadores
   const url = `https://maps.googleapis.com/maps/api/staticmap?`
     + `size=800x400`
     + `&scale=2`
     + `&maptype=roadmap`
-    + markers
+    + originMarker
+    + destinationMarker
+    + obstaclesMarkers
+    + path
     + `&key=${STATIC_MAPS_KEY}`;
 
   return url;
@@ -992,7 +1162,7 @@ async function gerarMapaEstatico(origem, destino, obstaculosParaPDF, altura) {
 
 async function getEncodedPath() {
   if (!rotaAtual?.routes?.[0]?.overview_polyline?.points) return "";
-  return encodeURIComponent(rotaAtual.routes[0].overview_polyline.points);
+  return rotaAtual.routes[0].overview_polyline.points;
 }
 
 /* =========================================================
@@ -1093,10 +1263,18 @@ async function gerarPDF() {
 
   // ---- MAPA ESTÁTICO ----
   try {
-    const imgData = await capturarMapa();
+    let imgData = await capturarMapa();
+    if (!imgData) {
+      const staticUrl = await gerarMapaEstatico(origem, destino, obstaculosNaRota);
+      if (staticUrl) imgData = await carregarImagemBase64(staticUrl);
+    }
+
     if (imgData) {
       doc.addImage(imgData, "PNG", margin, y, W - margin*2, 60);
       y += 65;
+    } else {
+      log("⚠️ Mapa não disponível para PDF — continuando sem imagem");
+      y += 4;
     }
   } catch(e) {
     log("⚠️ Mapa estático não disponível — continuando sem imagem");
