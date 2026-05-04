@@ -870,7 +870,7 @@ function verificarObstaculosNaRota(skipAlert = false) {
 
   const altura = parseNumeroFlex($("alturaCaminhao").value);
   if (isNaN(altura)) {
-    if (!skipAlert) alert("Informe a altura do caminhão.");
+    if (!skipAlert) alert("Informe a altura do conjunto.");
     return;
   }
 
@@ -913,7 +913,7 @@ function verificarObstaculosNaRota(skipAlert = false) {
           ${o.obs ? `Obs.: ${o.obs}<br>` : ""}
           <br>
           ${o.alturas.map((h, i) => `Altura ${i+1}: ${h.toFixed(2)} m`).join("<br>")}<br><br>
-          Caminhão: <b>${altura.toFixed(2)} m</b><br>
+          Altura: <b>${altura.toFixed(2)} m</b><br>
           Mín. registrada: <b>${o.alturaMin.toFixed(2)} m</b><br>
           <b style="color:${o.critico ? 'red' : 'green'}">${o.critico ? "BLOQUEANTE" : "OK"}</b>
         </div>`
