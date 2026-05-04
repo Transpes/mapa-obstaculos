@@ -10,16 +10,16 @@
   
 <style>
 :root {
-  --bg: #0f1117;
-  --surface: #181c27;
-  --surface2: #1e2333;
-  --border: #2a3050;
-  --accent: #f5a623;
-  --accent2: #e05c2a;
-  --danger: #e03a3a;
-  --ok: #2ecf7a;
-  --text: #dde3f0;
-  --muted: #7a86a3;
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface2: #edf2f8;
+  --border: #d3dde8;
+  --accent: #1a73e8;
+  --accent2: #ea4335;
+  --danger: #d93025;
+  --ok: #188038;
+  --text: #202124;
+  --muted: #5f6368;
   --panel-w: 400px;
 }
 
@@ -713,22 +713,13 @@ function extrairObstaculosDaBase(csv, origemTipo) {
 function initMap() {
   map = new google.maps.Map($("map"), {
     center: { lat: -19.5, lng: -44.0 }, zoom: 6,
-    mapTypeControl: true, streetViewControl: false, fullscreenControl: true,
-    styles: [
-      { elementType: "geometry", stylers: [{ color: "#1a1f2e" }] },
-      { elementType: "labels.text.stroke", stylers: [{ color: "#1a1f2e" }] },
-      { elementType: "labels.text.fill", stylers: [{ color: "#8a9bb5" }] },
-      { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a3050" }] },
-      { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3a4570" }] },
-      { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1320" }] },
-      { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#2a3050" }] }
-    ]
+    mapTypeControl: true, streetViewControl: false, fullscreenControl: true
   });
 
   directionsService = new google.maps.DirectionsService();
   directionsRenderer = new google.maps.DirectionsRenderer({
     draggable: true,
-    polylineOptions: { strokeColor: "#f5a623", strokeWeight: 4, strokeOpacity: 0.9 }
+    polylineOptions: { strokeColor: "#1a73e8", strokeWeight: 4, strokeOpacity: 0.9 }
   });
   directionsRenderer.setMap(map);
 
@@ -813,6 +804,9 @@ async function calcularRota() {
 
   setStatus("Calculando rota...", "loading");
   setLoadingState(true);
+  if (directionsRenderer) {
+    directionsRenderer.setMap(map);
+  }
 
   try {
     const res = await requestRoute({
@@ -991,7 +985,8 @@ function compartilharRota() {
     }
   }
 
-  const estado = { origem, destino, altura, pontos };
+  const polyline = rotaAtual?.routes?.[0]?.overview_polyline?.points || "";
+  const estado = { origem, destino, altura, polyline, pontos };
   const json   = JSON.stringify(estado);
   const b64    = btoa(unescape(encodeURIComponent(json)));
 
@@ -1038,7 +1033,7 @@ async function restaurarRotaDaURL() {
     const json = decodeBase64Utf8(r);
     if (!json) throw new Error("Link inválido");
     const estado = JSON.parse(json);
-    const { origem, destino, altura, pontos = [] } = estado;
+    const { origem, destino, altura, polyline = "", pontos = [] } = estado;
 
     $("origem").value = origem || "";
     $("destino").value = destino || "";
@@ -1048,14 +1043,58 @@ async function restaurarRotaDaURL() {
 
     setStatus("Restaurando rota do link...", "loading");
     setLoadingState(true);
-    log(`🔁 Restaurando rota (${pontos.length} pontos)...`);
+    log(`🔁 Restaurando rota do link...`);
 
-    await restaurarRota(origem, destino, pontos);
+    if (polyline) {
+      restaurarPolyline(polyline, origem, destino);
+    } else {
+      await restaurarRota(origem, destino, pontos);
+    }
   } catch (e) {
     log("❌ Erro ao restaurar rota da URL: " + e.message);
     setStatus("Erro ao restaurar rota", "error");
   } finally {
     setLoadingState(false);
+  }
+}
+
+function restaurarPolyline(encodedPolyline, origem, destino) {
+  if (!encodedPolyline || !google?.maps?.geometry?.encoding) {
+    throw new Error("Não foi possível decodificar a rota");
+  }
+
+  const path = google.maps.geometry.encoding.decodePath(encodedPolyline);
+  if (!path?.length) {
+    throw new Error("Rota decodificada inválida");
+  }
+
+  if (directionsRenderer) {
+    directionsRenderer.setMap(null);
+  }
+  if (rotaPolyline) {
+    rotaPolyline.setMap(null);
+  }
+
+  rotaPolyline = new google.maps.Polyline({
+    path,
+    strokeColor: "#1a73e8",
+    strokeWeight: 4,
+    strokeOpacity: 0.9,
+    map
+  });
+
+  rotaAtual = { routes: [{ overview_polyline: { points: encodedPolyline } }] };
+
+  const bounds = new google.maps.LatLngBounds();
+  path.forEach(point => bounds.extend(point));
+  map.fitBounds(bounds);
+
+  log("🛣️ Rota restaurada a partir do link");
+  setStatus("Rota restaurada", "ok");
+  updateActionButtons();
+
+  if (parseNumeroFlex($("alturaCaminhao").value) > 0) {
+    verificarObstaculosNaRota(true);
   }
 }
 
@@ -1109,11 +1148,12 @@ async function restaurarRota(origem, destino, pontos) {
     throw new Error("Não foi possível restaurar a rota");
   }
 
+  directionsRenderer.setMap(map);
   directionsRenderer.setDirections(lastDirections);
   rotaAtual = lastDirections;
 
   if (rotaPolyline) rotaPolyline.setMap(null);
-  rotaPolyline = new google.maps.Polyline({ path: combinedPath });
+  rotaPolyline = new google.maps.Polyline({ path: combinedPath, map, strokeColor: "#1a73e8", strokeWeight: 4, strokeOpacity: 0.9 });
 
   log("🛣️ Rota restaurada a partir do link");
   setStatus("Rota restaurada", "ok");
