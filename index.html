@@ -165,9 +165,7 @@ header img {
 
     <h3>3️⃣ Obstáculos</h3>
     <button onclick="verificarObstaculosNaRota()">Verificar obstáculos na rota</button>
-    <button onclick="gerarLinkCompartilhavel()">🔗 Copiar link da rota</button>
-    <button onclick="gerarPDFServidor()">📄 Exportar PDF profissional</button>
-    
+
     <div class="badge">As bases são carregadas automaticamente ao abrir o site.</div>
 
     <div id="status">Inicializando…</div>
@@ -266,11 +264,6 @@ function coordenadasValidas(lat, lng) {
          lat <= 90 &&
          lng >= -180 &&
          lng <= 180;
-}
-function getBoundsFromPolyline(poly) {
-  const bounds = new google.maps.LatLngBounds();
-  poly.getPath().forEach(p => bounds.extend(p));
-  return bounds;
 }
 function corrigirCoordenadasBrasil(lat, lng) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -517,98 +510,6 @@ function extrairObstaculosDaBase(csv, origemTipo) {
 /* =========================================================
    MAPA
    ========================================================= */
-function gerarLinkCompartilhavel() {
-  if (!rotaPolyline) {
-    alert("Calcule a rota primeiro.");
-    return;
-  }
-
-  const path = rotaPolyline.getPath().getArray();
-
-  const encodedPath = google.maps.geometry.encoding.encodePath(path);
-
-  const dados = {
-    origem: $("origem").value,
-    destino: $("destino").value,
-    path: coords
-  };
-
-  const encoded = btoa(JSON.stringify(dados));
-
-  const url = `${location.origin}${location.pathname}?rota=${encoded}`;
-
-  navigator.clipboard.writeText(url);
-
-  log("🔗 Link copiado para área de transferência");
-}
-
-function carregarRotaDaURL() {
-  const params = new URLSearchParams(window.location.search);
-  const rota = params.get("rota");
-
-  if (!rota) return;
-
-  try {
-    const dados = JSON.parse(atob(rota));
-
-    $("origem").value = dados.origem || "";
-    $("destino").value = dados.destino || "";
-
-    const path = google.maps.geometry.encoding.decodePath(dados.path);
-    
-    );
-
-    rotaPolyline = new google.maps.Polyline({
-      path,
-      strokeColor: "#0078d4",
-      strokeOpacity: 0.8,
-      strokeWeight: 4
-    });
-
-    rotaPolyline.setMap(map);
-
-    const bounds = new google.maps.LatLngBounds();
-    path.forEach(p => bounds.extend(p));
-    map.fitBounds(bounds);
-
-    log("🔗 Rota carregada via link");
-
-  } catch (e) {
-    console.error(e);
-  }
-}
-
-async function gerarPDFServidor() {
-  setStatus("Gerando PDF no servidor...");
-
-  try {
-    const resp = await fetch("http://localhost:3000/gerar-pdf", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ url: location.href })
-    });
-
-    if (!resp.ok) {
-      throw new Error("Erro ao gerar PDF");
-    }
-
-    const blob = await resp.blob();
-
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "rota_transpes.pdf";
-    link.click();
-
-    setStatus("PDF gerado com sucesso");
-
-  } catch (e) {
-    console.error(e);
-    setStatus("Erro ao gerar PDF");
-  }
-}
-  
 function initMap() {
   map = new google.maps.Map($("map"), {
     center: { lat: -19.5, lng: -44.0 },
@@ -629,13 +530,8 @@ function initMap() {
 
   directionsRenderer.addListener("directions_changed", () => {
     const directions = directionsRenderer.getDirections();
-   
-    if (rotaPolyline) {
-      rotaPolyline.setMap(null);
-    }
-    
     if (!directions || !directions.routes || !directions.routes.length) return;
-    
+
     rotaPolyline = new google.maps.Polyline({
       path: directions.routes[0].overview_path,
       strokeColor: "#0078d4",
@@ -659,7 +555,6 @@ function initMap() {
   log("Mapa inicializado");
   setStatus("Carregando bases automaticamente...");
   carregarTodasAsBases();
-  carregarRotaDaURL(); // 🔥 NOVO
 }
 
 /* =========================================================
@@ -723,10 +618,6 @@ function calcularRota() {
   const origemTxt = $("origem").value.trim();
   const destinoTxt = $("destino").value.trim();
 
-  if (rotaPolyline) {
-    rotaPolyline.setMap(null);
-  }
-  
   if (!origemTxt || !destinoTxt) {
     alert("Preencha origem e destino.");
     return;
@@ -791,25 +682,17 @@ function verificarObstaculosNaRota() {
 
   let criticos = 0;
   let encontrados = 0;
-  
-  const bounds = getBoundsFromPolyline(rotaPolyline);
-  
+
   obstacles.forEach(o => {
+    const pos = new google.maps.LatLng(o.lat, o.lng);
 
-  // 🔥 FILTRO RÁPIDO
-  if (!bounds.contains(new google.maps.LatLng(o.lat, o.lng))) {
-    return;
-  }
+    const perto = google.maps.geometry.poly.isLocationOnEdge(
+      pos,
+      rotaPolyline,
+      0.01
+    );
 
-  const pos = new google.maps.LatLng(o.lat, o.lng);
-
-  const perto = google.maps.geometry.poly.isLocationOnEdge(
-    pos,
-    rotaPolyline,
-    0.005
-  );
-
-  if (!perto) return;
+    if (!perto) return;
 
     encontrados++;
 
