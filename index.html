@@ -6,7 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  
 <style>
 :root {
   --bg: #0f1117;
@@ -880,7 +881,7 @@ function compartilharRota() {
   // Amostragem: máximo 80 pontos intermediários (exclui primeiro e último)
   // 80 pontos × ~30 chars cada ≈ 2.4KB em base64 — URL confortável
   const interior = path.slice(1, path.length - 1); // remove origem e destino
-  const MAX = 80;
+  const MAX = 200;
   let pontos = [];
 
   if (interior.length <= MAX) {
@@ -932,16 +933,7 @@ function copiarLink() {
    distribuímos os pontos em até 3 lotes sequenciais.
    ========================================================= */
 function restaurarRotaDaURL() {
-  const params = new URLSearchParams(window.location.search);
-  const b64 = params.get("r");
-  if (!b64) return;
-
-  let estado;
-  try {
-    estado = JSON.parse(decodeURIComponent(escape(atob(b64))));
-  } catch (e) {
-    log("⚠️ Link inválido ou corrompido");
-    return;
+  executarRotaComWaypoints(origem, destino, pontos);
   }
 
   const { origem, destino, altura, pontos = [] } = estado;
@@ -958,7 +950,7 @@ function restaurarRotaDaURL() {
   // Seleciona até 23 pontos bem distribuídos como via points
   // (Directions API aceita até 25 waypoints total na versão paga,
   //  e 8 na gratuita — usamos 8 para máxima compatibilidade)
-  const MAX_WP = 8;
+  const MAX_WP = 23;
   let selecionados = [];
 
   if (pontos.length <= MAX_WP) {
@@ -976,18 +968,60 @@ function restaurarRotaDaURL() {
     stopover: false
   }));
 
-  directionsService.route({
-    origin:           origem,
-    destination:      destino,
-    waypoints:        wps,
-    optimizeWaypoints: false,
-    travelMode:       "DRIVING"
-  }, (res, status) => {
-    if (status !== "OK") {
-      log("❌ Não foi possível restaurar a rota: " + status);
-      setStatus("Erro ao restaurar rota", "error");
+function executarRotaComWaypoints(origem, destino, pontos) {
+  const CHUNK = 23;
+  let segmentos = [];
+
+  for (let i = 0; i < pontos.length; i += CHUNK) {
+    segmentos.push(pontos.slice(i, i + CHUNK));
+  }
+
+  let rotaFinal = null;
+
+  function processarSegmento(index, origemAtual) {
+    if (index >= segmentos.length) {
+      directionsRenderer.setDirections(rotaFinal);
+      rotaAtual = rotaFinal;
+      rotaPolyline = new google.maps.Polyline({
+        path: rotaFinal.routes[0].overview_path
+      });
+
+      log("✅ Rota restaurada com fidelidade alta");
+      setStatus("Rota restaurada", "ok");
+
+      if ($("alturaCaminhao").value && basesCarregadas) {
+        verificarObstaculosNaRota();
+      }
       return;
     }
+
+    const waypoints = segmentos[index].map(([lat, lng]) => ({
+      location: new google.maps.LatLng(lat, lng),
+      stopover: false
+    }));
+
+    directionsService.route({
+      origin: origemAtual,
+      destination: destino,
+      waypoints,
+      optimizeWaypoints: false,
+      travelMode: "DRIVING"
+    }, (res, status) => {
+      if (status !== "OK") {
+        log("❌ Erro ao restaurar rota: " + status);
+        setStatus("Erro ao restaurar rota", "error");
+        return;
+      }
+
+      rotaFinal = res;
+      const novoInicio = res.routes[0].legs.slice(-1)[0].end_location;
+
+      processarSegmento(index + 1, novoInicio);
+    });
+  }
+
+  processarSegmento(0, origem);
+}
 
     directionsRenderer.setDirections(res);
     rotaAtual    = res;
@@ -1042,6 +1076,24 @@ async function getEncodedPath() {
 /* =========================================================
    GERAR PDF
    ========================================================= */
+
+async function capturarMapa() {
+  const mapDiv = document.getElementById("map");
+
+  try {
+    const canvas = await html2canvas(mapDiv, {
+      useCORS: true,
+      allowTaint: true,
+      scale: 2
+    });
+
+    return canvas.toDataURL("image/png");
+  } catch (e) {
+    log("⚠️ Erro ao capturar mapa");
+    return null;
+  }
+}
+  
 async function gerarPDF() {
   const origem = $("origem").value.trim();
   const destino = $("destino").value.trim();
@@ -1119,8 +1171,7 @@ async function gerarPDF() {
 
   // ---- MAPA ESTÁTICO ----
   try {
-    const mapaUrl = await gerarMapaEstatico(origem, destino, obstaculosNaRota, altura);
-    const imgData = await carregarImagemBase64(mapaUrl);
+    const imgData = await capturarMapa();
     if (imgData) {
       doc.addImage(imgData, "PNG", margin, y, W - margin*2, 60);
       y += 65;
