@@ -933,107 +933,29 @@ function copiarLink() {
    distribuímos os pontos em até 3 lotes sequenciais.
    ========================================================= */
 function restaurarRotaDaURL() {
-  executarRotaComWaypoints(origem, destino, pontos);
+  const urlParams = new URLSearchParams(window.location.search);
+  const r = urlParams.get('r');
+  if (!r) return;
+
+  try {
+    const json = decodeURIComponent(escape(atob(r)));
+    const estado = JSON.parse(json);
+    const { origem, destino, altura, pontos = [] } = estado;
+
+    $("origem").value         = origem  || "";
+    $("destino").value        = destino || "";
+    $("alturaCaminhao").value = altura  || "";
+
+    if (!origem || !destino) return;
+
+    setStatus("Restaurando rota do link...", "loading");
+    log(`🔁 Restaurando rota (${pontos.length} pontos)...`);
+
+    executarRotaComWaypoints(origem, destino, pontos);
+  } catch (e) {
+    log("❌ Erro ao restaurar rota da URL: " + e.message);
+    setStatus("Erro ao restaurar rota", "error");
   }
-
-  const { origem, destino, altura, pontos = [] } = estado;
-
-  $("origem").value         = origem  || "";
-  $("destino").value        = destino || "";
-  $("alturaCaminhao").value = altura  || "";
-
-  if (!origem || !destino) return;
-
-  setStatus("Restaurando rota do link...", "loading");
-  log(`🔁 Restaurando rota (${pontos.length} pontos)...`);
-
-  // Seleciona até 23 pontos bem distribuídos como via points
-  // (Directions API aceita até 25 waypoints total na versão paga,
-  //  e 8 na gratuita — usamos 8 para máxima compatibilidade)
-  const MAX_WP = 23;
-  let selecionados = [];
-
-  if (pontos.length <= MAX_WP) {
-    selecionados = pontos;
-  } else {
-    // Distribui uniformemente, garantindo pontos nos extremos do interior
-    const step = (pontos.length - 1) / (MAX_WP - 1);
-    for (let i = 0; i < MAX_WP; i++) {
-      selecionados.push(pontos[Math.round(i * step)]);
-    }
-  }
-
-  const wps = selecionados.map(([lat, lng]) => ({
-    location: new google.maps.LatLng(lat, lng),
-    stopover: false
-  }));
-
-function executarRotaComWaypoints(origem, destino, pontos) {
-  const CHUNK = 23;
-  let segmentos = [];
-
-  for (let i = 0; i < pontos.length; i += CHUNK) {
-    segmentos.push(pontos.slice(i, i + CHUNK));
-  }
-
-  let rotaFinal = null;
-
-  function processarSegmento(index, origemAtual) {
-    if (index >= segmentos.length) {
-      directionsRenderer.setDirections(rotaFinal);
-      rotaAtual = rotaFinal;
-      rotaPolyline = new google.maps.Polyline({
-        path: rotaFinal.routes[0].overview_path
-      });
-
-      log("✅ Rota restaurada com fidelidade alta");
-      setStatus("Rota restaurada", "ok");
-
-      if ($("alturaCaminhao").value && basesCarregadas) {
-        verificarObstaculosNaRota();
-      }
-      return;
-    }
-
-    const waypoints = segmentos[index].map(([lat, lng]) => ({
-      location: new google.maps.LatLng(lat, lng),
-      stopover: false
-    }));
-
-    directionsService.route({
-      origin: origemAtual,
-      destination: destino,
-      waypoints,
-      optimizeWaypoints: false,
-      travelMode: "DRIVING"
-    }, (res, status) => {
-      if (status !== "OK") {
-        log("❌ Erro ao restaurar rota: " + status);
-        setStatus("Erro ao restaurar rota", "error");
-        return;
-      }
-
-      rotaFinal = res;
-      const novoInicio = res.routes[0].legs.slice(-1)[0].end_location;
-
-      processarSegmento(index + 1, novoInicio);
-    });
-  }
-
-  processarSegmento(0, origem);
-}
-
-    directionsRenderer.setDirections(res);
-    rotaAtual    = res;
-    rotaPolyline = new google.maps.Polyline({ path: res.routes[0].overview_path });
-
-    log("✅ Rota restaurada com sucesso");
-    setStatus("Rota restaurada", "ok");
-
-    if (altura && !isNaN(parseNumeroFlex(altura)) && basesCarregadas) {
-      verificarObstaculosNaRota();
-    }
-  });
 }
 
 /* =========================================================
