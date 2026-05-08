@@ -991,8 +991,8 @@ function verificarObstaculosNaRota(skipAlert = false) {
           ${o.obs      ? `Obs.: ${o.obs}<br>` : ""}
           ${fonteHtml}
           <br>
-          ${o.alturas.map((h, i) => `Altura ${i+1}: ${h.toFixed(2)} m`).join("<br>")}<br><br>
-          Altura do veículo: <b>${altura.toFixed(2)} m</b><br>
+          ${o.alturas.map((h, i) => `Altura ${["Esquerda","Central","Direita"][i] ?? i+1}: ${h.toFixed(2)} m`).join("<br>")}<br><br>
+          Altura do conjunto: <b>${altura.toFixed(2)} m</b><br>
           Mín. registrada: <b>${o.alturaMin.toFixed(2)} m</b><br>
           <b style="color:${o.critico ? 'red' : 'green'}">${o.critico ? "BLOQUEANTE" : "OK"}</b>
         </div>`
@@ -1427,8 +1427,8 @@ async function gerarPDF() {
   doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(200,210,225);
   doc.text("Origem:", margin+6, y+16); doc.setFont("helvetica","bold"); doc.text(origem, margin+28, y+16);
   doc.setFont("helvetica","normal"); doc.text("Destino:", margin+6, y+22); doc.setFont("helvetica","bold"); doc.text(destino, margin+28, y+22);
-  doc.setFont("helvetica","normal"); doc.text("Altura do veículo:", margin+6, y+28);
-  doc.setFont("helvetica","bold"); doc.setTextColor(245,166,35); doc.text(altura.toFixed(2)+" m", margin+50, y+28);
+  doc.setFont("helvetica","normal"); doc.text("Altura do conjunto:", margin+6, y+28);
+  doc.setFont("helvetica","bold"); doc.setTextColor(245,166,35); doc.text(altura.toFixed(2)+" m", margin+55, y+28);
   y += 38;
 
   // MAPA
@@ -1467,8 +1467,10 @@ async function gerarPDF() {
 
     doc.setFillColor(30,35,51); doc.rect(margin,y,W-margin*2,7,"F");
     doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(180,190,210);
-    const cols    = [margin+2, margin+46, margin+66, margin+86, margin+109, margin+130, margin+152, margin+174];
-    const headers = ["Via / Local","UF","KM","Alt.mín.","Veículo","Fonte","Base","Status"];
+    // Colunas: Via/Local(30) | UF(10) | KM(12) | Alt.mín.(16) | Fonte(22) | Coordenada(38) | Status(14)
+    // margin=14, área útil=182mm
+    const cols    = [margin+2, margin+34, margin+46, margin+60, margin+78, margin+102, margin+148];
+    const headers = ["Via / Local","UF","KM","Alt.mín.","Fonte","Coordenada","Status"];
     headers.forEach((h,i) => doc.text(h, cols[i], y+5));
     y += 8;
 
@@ -1477,16 +1479,15 @@ async function gerarPDF() {
       doc.setFillColor(...(idx%2===0 ? [20,23,35] : [24,28,39])); doc.rect(margin,y,W-margin*2,8,"F");
       doc.setFillColor(...(o.critico ? [224,58,58] : [46,207,122])); doc.rect(margin,y,2,8,"F");
       doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(200,210,225);
-      doc.text((o.via||"Via não informada").substring(0,22), cols[0], y+5.5);
-      doc.text(o.uf||"-",                                    cols[1], y+5.5);
-      doc.text(o.km||"-",                                    cols[2], y+5.5);
-      doc.text(o.alturaMin.toFixed(2)+" m",                  cols[3], y+5.5);
-      doc.text(altura.toFixed(2)+" m",                       cols[4], y+5.5);
-      doc.text((o.fonte||"-").substring(0,12),               cols[5], y+5.5);
-      doc.text((o.origemBase||"-").substring(0,12),          cols[6], y+5.5);
+      doc.text((o.via||"Via não informada").substring(0,18),          cols[0], y+5.5);
+      doc.text(o.uf||"-",                                              cols[1], y+5.5);
+      doc.text(o.km||"-",                                              cols[2], y+5.5);
+      doc.text(o.alturaMin.toFixed(2)+" m",                           cols[3], y+5.5);
+      doc.text((o.fonte||"-").substring(0,16),                        cols[4], y+5.5);
+      doc.text(`${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}`,            cols[5], y+5.5);
       doc.setFont("helvetica","bold");
       doc.setTextColor(o.critico?224:46, o.critico?58:207, o.critico?58:122);
-      doc.text(o.critico?"CRÍTICO":"OK",                     cols[7], y+5.5);
+      doc.text(o.critico?"CRÍTICO":"OK",                              cols[6], y+5.5);
       y += 8;
     });
   } else {
