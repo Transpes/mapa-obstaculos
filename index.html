@@ -35,7 +35,6 @@ body {
   flex-direction: column;
 }
 
-/* ===== HEADER ===== */
 header {
   background: var(--surface);
   border-bottom: 2px solid var(--accent);
@@ -64,14 +63,12 @@ header img { height: 100px; }
   margin-left: auto;
 }
 
-/* ===== LAYOUT ===== */
 .container {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
-/* ===== PANEL ===== */
 .panel {
   width: var(--panel-w);
   background: var(--surface);
@@ -92,7 +89,6 @@ header img { height: 100px; }
 .panel-scroll::-webkit-scrollbar-track { background: transparent; }
 .panel-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-/* ===== SECTION ===== */
 .section {
   margin-bottom: 18px;
 }
@@ -112,7 +108,6 @@ header img { height: 100px; }
   gap: 6px;
 }
 
-/* ===== INPUTS ===== */
 label {
   display: block;
   font-size: 11px;
@@ -144,7 +139,6 @@ input:focus {
 
 input::placeholder { color: var(--muted); }
 
-/* ===== BUTTONS ===== */
 .btn {
   width: 100%;
   padding: 9px 14px;
@@ -197,7 +191,6 @@ input::placeholder { color: var(--muted); }
   transform: none !important;
 }
 
-/* ===== STATUS ===== */
 .status-bar {
   display: flex;
   align-items: center;
@@ -228,7 +221,6 @@ input::placeholder { color: var(--muted); }
   50% { opacity: 0.3; }
 }
 
-/* ===== LOG ===== */
 #log {
   background: var(--bg);
   color: #5dde9a;
@@ -245,7 +237,6 @@ input::placeholder { color: var(--muted); }
 #log::-webkit-scrollbar { width: 3px; }
 #log::-webkit-scrollbar-thumb { background: var(--border); }
 
-/* ===== OBSTÁCULOS ===== */
 #resultadoContainer {
   margin-top: 4px;
 }
@@ -269,7 +260,6 @@ input::placeholder { color: var(--muted); }
   border-left-color: var(--ok);
 }
 
-/* ===== RESUMO ===== */
 .resumo-bar {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -303,7 +293,6 @@ input::placeholder { color: var(--muted); }
   margin-top: 3px;
 }
 
-/* ===== EXPORT AREA ===== */
 .export-area {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -337,10 +326,8 @@ input::placeholder { color: var(--muted); }
 }
 .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-/* ===== MAP ===== */
 #map { flex: 1; }
 
-/* ===== FOOTER ===== */
 .footer {
   padding: 10px 16px;
   font-size: 10px;
@@ -351,7 +338,6 @@ input::placeholder { color: var(--muted); }
   flex-shrink: 0;
 }
 
-/* ===== AUTOCOMPLETE OVERRIDE ===== */
 .pac-container {
   background: var(--surface2) !important;
   border: 1px solid var(--border) !important;
@@ -382,7 +368,6 @@ input::placeholder { color: var(--muted); }
   <div class="panel">
     <div class="panel-scroll">
 
-      <!-- STATUS -->
       <div class="section">
         <div class="status-bar">
           <div class="status-dot loading" id="statusDot"></div>
@@ -391,7 +376,6 @@ input::placeholder { color: var(--muted); }
         <div id="log"></div>
       </div>
 
-      <!-- ROTA -->
       <div class="section">
         <div class="section-title">Definir rota</div>
         <label>Origem</label>
@@ -403,7 +387,6 @@ input::placeholder { color: var(--muted); }
         </button>
       </div>
 
-      <!-- VEÍCULO -->
       <div class="section">
         <div class="section-title">Parâmetros do veículo</div>
         <label>Altura do caminhão (m)</label>
@@ -413,7 +396,6 @@ input::placeholder { color: var(--muted); }
         </button>
       </div>
 
-      <!-- EXPORTAR -->
       <div class="section">
         <div class="section-title">Exportar</div>
 
@@ -424,15 +406,14 @@ input::placeholder { color: var(--muted); }
         <div class="export-area" id="linkArea" style="display:none">
           <div style="font-size:11px; color:var(--muted); margin-bottom:4px">Link da rota (abre no Transpes GO com tudo pronto):</div>
           <span id="linkCompartilhado" class="export-link" style="cursor:default">Link não gerado ainda</span>
-          <button class="copy-btn" onclick="copiarLink()">ðŸ“‹ Copiar link</button>
+          <button class="copy-btn" onclick="copiarLink()">📋 Copiar link</button>
         </div>
 
         <button class="btn btn-secondary" onclick="gerarPDF()" id="btnPDF" style="margin-top:8px">
-          ðŸ“„ Exportar relatório PDF
+          📄 Exportar relatório PDF
         </button>
       </div>
 
-      <!-- RESULTADOS -->
       <div class="section" id="secaoResultados" style="display:none">
         <div class="section-title">Obstáculos na rota</div>
         <div class="resumo-bar">
@@ -473,7 +454,12 @@ const CSV_URL_2 =
 const GOOGLE_MAPS_KEY = "AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4";
 const STATIC_MAPS_KEY = "AIzaSyAsCCdeA0KSgHffeuSmsDyaGT86ZJytIz4";
 const MAX_WAYPOINTS_PER_REQUEST = 8;
-const OBSTACLE_DISTANCE_METERS = 120;
+
+// ─── DISTÂNCIA DE DETECÇÃO ────────────────────────────────
+// Aumentada para 150 m e calculada com geometria esférica real,
+// percorrendo TODOS os segmentos do traçado (inclusive trechos
+// arrastados que o overview_path comprime demais).
+const OBSTACLE_DISTANCE_METERS = 150;
 
 /* =========================================================
    ESTADO
@@ -485,6 +471,10 @@ let carregamentoEmAndamento = false;
 let basesCarregadas = false;
 let rotaAtual = null;
 let obstaculosNaRota = [];
+
+// Armazena os pontos "densos" da rota atual (todos os steps de
+// todas as legs, não apenas o overview simplificado).
+let rotaPathDenso = [];
 
 /* =========================================================
    UTILS
@@ -514,46 +504,36 @@ function setLoadingState(loading) {
 
 function updateActionButtons() {
   const hasRoute = Boolean(rotaAtual?.routes?.length);
-  const hasPath = Boolean(rotaPolyline?.getPath?.()?.getLength());
-  const enabled = !carregamentoEmAndamento;
+  const hasPath  = rotaPathDenso.length > 0 || Boolean(rotaPolyline?.getPath?.()?.getLength());
+  const enabled  = !carregamentoEmAndamento;
 
   const setButton = (id, allow) => {
-    const button = $(id);
-    if (button) button.disabled = !allow;
+    const b = $(id);
+    if (b) b.disabled = !allow;
   };
 
-  setButton("btnCalcular", enabled);
-  setButton("btnVerificar", enabled && basesCarregadas && hasPath);
+  setButton("btnCalcular",   enabled);
+  setButton("btnVerificar",  enabled && basesCarregadas && hasPath);
   setButton("btnCompartilhar", enabled && hasRoute);
-  setButton("btnPDF", enabled && hasRoute);
+  setButton("btnPDF",        enabled && hasRoute);
 }
 
 function onEnter(action) {
-  return event => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      action();
-    }
-  };
+  return event => { if (event.key === "Enter") { event.preventDefault(); action(); } };
 }
 
 function decodeBase64Utf8(value) {
   try {
     const text = atob(value);
-    return decodeURIComponent(Array.from(text, char => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
-  } catch {
-    return null;
-  }
+    return decodeURIComponent(Array.from(text, c => `%${c.charCodeAt(0).toString(16).padStart(2,"0")}`).join(""));
+  } catch { return null; }
 }
 
 function requestRoute(options) {
   return new Promise((resolve, reject) => {
     directionsService.route(options, (res, status) => {
-      if (status === "OK" && res?.routes?.length) {
-        resolve(res);
-      } else {
-        reject(new Error(status || "Erro ao buscar rota"));
-      }
+      if (status === "OK" && res?.routes?.length) resolve(res);
+      else reject(new Error(status || "Erro ao buscar rota"));
     });
   });
 }
@@ -585,6 +565,100 @@ function corrigirCoordenadasBrasil(lat, lng) {
   if (lat > 0) lat = -lat;
   if (lng > 0) lng = -lng;
   return { lat, lng };
+}
+
+/* =========================================================
+   DISTÂNCIA HAVERSINE (metros) — sem depender da lib Google
+   ========================================================= */
+function haversineMetros(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+            Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/**
+ * Distância mínima (metros) de um ponto a um segmento lat/lng.
+ * Usa projeção cartesiana local — precisa suficiente para ~500 m.
+ */
+function distanciaSegmentoMetros(pLat, pLng, aLat, aLng, bLat, bLng) {
+  // Converte para metros locais tendo A como origem
+  const cosLat = Math.cos(aLat * Math.PI / 180);
+  const mPorGrau = 111319.5;
+
+  const ax = 0, ay = 0;
+  const bx = (bLng - aLng) * mPorGrau * cosLat;
+  const by = (bLat - aLat) * mPorGrau;
+  const px = (pLng - aLng) * mPorGrau * cosLat;
+  const py = (pLat - aLat) * mPorGrau;
+
+  const ab2 = bx*bx + by*by;
+  if (ab2 === 0) return Math.hypot(px, py); // segmento degenerado
+
+  const t = Math.max(0, Math.min(1, (px*bx + py*by) / ab2));
+  const closestX = ax + t * bx;
+  const closestY = ay + t * by;
+  return Math.hypot(px - closestX, py - closestY);
+}
+
+/**
+ * Verifica se o ponto (lat, lng) está a menos de OBSTACLE_DISTANCE_METERS
+ * de qualquer segmento do array de pontos da rota.
+ *
+ * Usa `rotaPathDenso` quando disponível (inclui todos os steps das legs),
+ * caindo para `rotaPolyline` como fallback.
+ */
+function estaPertoDaRota(lat, lng) {
+  const path = rotaPathDenso.length > 0
+    ? rotaPathDenso
+    : (rotaPolyline?.getPath ? rotaPolyline.getPath().getArray() : []);
+
+  if (path.length < 2) return false;
+
+  const getLat = p => (typeof p.lat === "function" ? p.lat() : p.lat);
+  const getLng = p => (typeof p.lng === "function" ? p.lng() : p.lng);
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const aLat = getLat(path[i]),   aLng = getLng(path[i]);
+    const bLat = getLat(path[i+1]), bLng = getLng(path[i+1]);
+    const dist = distanciaSegmentoMetros(lat, lng, aLat, aLng, bLat, bLng);
+    if (dist <= OBSTACLE_DISTANCE_METERS) return true;
+  }
+  return false;
+}
+
+/**
+ * Extrai o caminho denso de um objeto DirectionsResult:
+ * percorre todas as legs → steps → lat/lng de cada step.
+ * Isso garante que trechos arrastados (que o overview_path simplifica)
+ * também sejam cobertos.
+ */
+function extrairPathDenso(directionsResult) {
+  const pontos = [];
+  try {
+    const legs = directionsResult?.routes?.[0]?.legs || [];
+    for (const leg of legs) {
+      for (const step of leg.steps || []) {
+        const stepPath = step.path || step.lat_lngs || [];
+        for (const p of stepPath) {
+          pontos.push({ lat: p.lat(), lng: p.lng() });
+        }
+      }
+    }
+  } catch(e) {
+    // fallback silencioso
+  }
+  // Se não conseguiu extrair steps (e.g. rota restaurada de link),
+  // usa o overview_path disponível
+  if (pontos.length === 0 && directionsResult?.routes?.[0]?.overview_path) {
+    for (const p of directionsResult.routes[0].overview_path) {
+      pontos.push({ lat: p.lat(), lng: p.lng() });
+    }
+  }
+  return pontos;
 }
 
 /* =========================================================
@@ -672,19 +746,28 @@ function normalizarRegistroBase1(obj) {
   };
 }
 
+// ─── BASE 2 — Planilha "Registros Vistoria" ───────────────
+// Colunas: data_hora | latitude | longitude | altura1 | altura2 | altura3 | observacao | fonte
 function normalizarRegistroBase2(obj) {
   const { lat, lng } = extrairCoordenadasDaLinha(obj);
   const alturas = extrairAlturasDaLinha(obj);
   if (!coordenadasValidas(lat, lng) || !alturas.length) return null;
+
+  const fonte = pegarCampo(obj, ["fonte"]);
+  const obs   = pegarCampo(obj, ["observacao", "observacao_livre", "obs"]);
+  const data  = pegarCampo(obj, ["data_hora", "datahora", "data"]);
+
   return {
-    origemBase: "Base formulário",
-    origemDetalhe: "Registros enviados pelo site",
-    via: "Registro manual",
-    uf: "", km: "",
-    descricao: "Ponto alimentado pelo formulário",
-    obs: pegarCampo(obj, ["observacao", "observacao_livre", "obs"]) || "",
-    data: pegarCampo(obj, ["data_hora", "datahora", "data"]) || "",
-    fonte: pegarCampo(obj, ["fonte", "evg"]) || "",
+    origemBase:    "Registros Vistoria",
+    origemDetalhe: "Registros enviados pelo formulário",
+    via:      "Vistoria de campo",
+    uf:  "",
+    km:  "",
+    descricao: obs || "Ponto de vistoria",
+    obs,
+    data,
+    // fonte é exibida tanto no card lateral quanto no mapa
+    fonte,
     lat, lng, alturas,
     alturaMin: Math.min(...alturas)
   };
@@ -716,7 +799,7 @@ function initMap() {
     mapTypeControl: true, streetViewControl: false, fullscreenControl: true
   });
 
-  directionsService = new google.maps.DirectionsService();
+  directionsService  = new google.maps.DirectionsService();
   directionsRenderer = new google.maps.DirectionsRenderer({
     draggable: true,
     polylineOptions: { strokeColor: "#1a73e8", strokeWeight: 4, strokeOpacity: 0.9 }
@@ -727,9 +810,14 @@ function initMap() {
     const directions = directionsRenderer.getDirections();
     if (!directions?.routes?.length) return;
     rotaAtual = directions;
+
+    // ← Recaptura o path DENSO sempre que a rota muda (incluindo drag)
+    rotaPathDenso = extrairPathDenso(directions);
+
     if (rotaPolyline) rotaPolyline.setMap(null);
     rotaPolyline = new google.maps.Polyline({ path: directions.routes[0].overview_path });
-    log(">> Rota alterada — recalculando obstáculos");
+
+    log(">> Rota alterada — recalculando obstáculos (" + rotaPathDenso.length + " pts)");
     if (parseNumeroFlex($("alturaCaminhao").value) > 0) {
       verificarObstaculosNaRota(true);
     } else {
@@ -778,12 +866,12 @@ async function carregarTodasAsBases() {
     obstacles = deduplicarObstaculos([...base1, ...base2]);
 
     log(`OK Base histórica: ${base1.length} registros`);
-    log(`OK Base formulário: ${base2.length} registros`);
+    log(`OK Registros Vistoria: ${base2.length} registros`);
     log(`OK Total consolidado: ${obstacles.length}`);
     basesCarregadas = true;
     setStatus("Bases carregadas — Sistema pronto", "ok");
     updateActionButtons();
-    await restaurarRotaDaURL(); // tenta restaurar rota do link após bases prontas
+    await restaurarRotaDaURL();
 
   } catch (erro) {
     basesCarregadas = false;
@@ -798,29 +886,27 @@ async function carregarTodasAsBases() {
    ROTA
    ========================================================= */
 async function calcularRota() {
-  const origemTxt = $("origem").value.trim();
+  const origemTxt  = $("origem").value.trim();
   const destinoTxt = $("destino").value.trim();
   if (!origemTxt || !destinoTxt) { alert("Preencha origem e destino."); return; }
 
   setStatus("Calculando rota...", "loading");
   setLoadingState(true);
-  if (directionsRenderer) {
-    directionsRenderer.setMap(map);
-  }
+  if (directionsRenderer) directionsRenderer.setMap(map);
 
   try {
     const res = await requestRoute({
-      origin: origemTxt,
-      destination: destinoTxt,
-      travelMode: "DRIVING"
+      origin: origemTxt, destination: destinoTxt, travelMode: "DRIVING"
     });
 
     directionsRenderer.setDirections(res);
-    rotaAtual = res;
+    rotaAtual     = res;
+    rotaPathDenso = extrairPathDenso(res);
+
     if (rotaPolyline) rotaPolyline.setMap(null);
     rotaPolyline = new google.maps.Polyline({ path: res.routes[0].overview_path });
 
-    log("ðŸ›£ï¸ Rota calculada");
+    log("🛣️ Rota calculada (" + rotaPathDenso.length + " pontos densos)");
     setStatus("Rota calculada", "ok");
     if (parseNumeroFlex($("alturaCaminhao").value) > 0) {
       verificarObstaculosNaRota(true);
@@ -841,19 +927,6 @@ function limparMarcadores() {
   obstacleMarkers = [];
 }
 
-function estaPertoDaRota(lat, lng) {
-  if (!rotaPolyline || !google?.maps?.geometry?.poly) return false;
-
-  const pos = new google.maps.LatLng(lat, lng);
-  const tolerancia = OBSTACLE_DISTANCE_METERS / 111000;
-
-  try {
-    return google.maps.geometry.poly.isLocationOnEdge(pos, rotaPolyline, tolerancia);
-  } catch {
-    return false;
-  }
-}
-
 function verificarObstaculosNaRota(skipAlert = false) {
   if (carregamentoEmAndamento) {
     if (!skipAlert) alert("Aguarde o carregamento das bases.");
@@ -863,7 +936,7 @@ function verificarObstaculosNaRota(skipAlert = false) {
     if (!skipAlert) alert("Bases não carregadas.");
     return;
   }
-  if (!rotaPolyline) {
+  if (rotaPathDenso.length === 0 && !rotaPolyline) {
     if (!skipAlert) alert("Calcule a rota primeiro.");
     return;
   }
@@ -885,12 +958,12 @@ function verificarObstaculosNaRota(skipAlert = false) {
 
   const criticos = obstaculosNaRota.filter(o => o.critico).length;
 
-  $("numTotal").innerText = obstaculosNaRota.length;
+  $("numTotal").innerText  = obstaculosNaRota.length;
   $("numCritico").innerText = criticos;
   $("secaoResultados").style.display = "block";
 
   obstaculosNaRota.forEach(o => {
-    const pos = new google.maps.LatLng(o.lat, o.lng);
+    const pos    = new google.maps.LatLng(o.lat, o.lng);
     const marker = new google.maps.Marker({
       map,
       position: pos,
@@ -901,33 +974,41 @@ function verificarObstaculosNaRota(skipAlert = false) {
     });
     obstacleMarkers.push(marker);
 
+    // ─── Info Window — inclui "fonte" quando disponível ───
+    const fonteHtml = o.fonte
+      ? `Fonte: <b>${o.fonte}</b><br>`
+      : "";
+
     const infoWindow = new google.maps.InfoWindow({
       content: `
         <div style="font-size:12px;line-height:1.5;min-width:200px">
           <strong>${o.via || "Via não informada"}</strong><br>
           <span style="color:#666">${o.origemBase}</span><br>
-          ${o.uf ? `UF: <b>${o.uf}</b><br>` : ""}
-          ${o.km ? `KM: <b>${o.km}</b><br>` : ""}
-          ${o.descricao ? `Descrição: ${o.descricao}<br>` : ""}
-          ${o.data ? `Data: ${o.data}<br>` : ""}
-          ${o.obs ? `Obs.: ${o.obs}<br>` : ""}
+          ${o.uf       ? `UF: <b>${o.uf}</b><br>` : ""}
+          ${o.km       ? `KM: <b>${o.km}</b><br>` : ""}
+          ${o.descricao? `Descrição: ${o.descricao}<br>` : ""}
+          ${o.data     ? `Data: ${o.data}<br>` : ""}
+          ${o.obs      ? `Obs.: ${o.obs}<br>` : ""}
+          ${fonteHtml}
           <br>
           ${o.alturas.map((h, i) => `Altura ${i+1}: ${h.toFixed(2)} m`).join("<br>")}<br><br>
-          Altura: <b>${altura.toFixed(2)} m</b><br>
+          Altura do veículo: <b>${altura.toFixed(2)} m</b><br>
           Mín. registrada: <b>${o.alturaMin.toFixed(2)} m</b><br>
           <b style="color:${o.critico ? 'red' : 'green'}">${o.critico ? "BLOQUEANTE" : "OK"}</b>
         </div>`
     });
     marker.addListener("mouseover", () => infoWindow.open(map, marker));
-    marker.addListener("mouseout", () => infoWindow.close());
+    marker.addListener("mouseout",  () => infoWindow.close());
 
+    // ─── Card lateral — inclui "fonte" quando disponível ──
     const div = document.createElement("div");
     div.className = "obstaculo-item " + (o.critico ? "obstaculo-critico" : "obstaculo-ok");
     div.innerHTML = `
-      <strong>${o.critico ? "ðŸš«" : "OK"} ${o.via || "Via não informada"}</strong><br>
-      ${o.uf ? `UF: ${o.uf} · ` : ""}${o.km ? `KM: ${o.km}<br>` : "<br>"}
+      <strong>${o.critico ? "🚫" : "✅"} ${o.via || "Via não informada"}</strong><br>
+      ${o.uf   ? `UF: ${o.uf} · ` : ""}${o.km ? `KM: ${o.km}<br>` : "<br>"}
       ${o.descricao ? `${o.descricao}<br>` : ""}
-      ${o.obs ? `Obs.: ${o.obs}<br>` : ""}
+      ${o.obs  ? `Obs.: ${o.obs}<br>` : ""}
+      ${o.fonte? `Fonte: <b>${o.fonte}</b><br>` : ""}
       Coordenadas: ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br>
       Altura mín.: <b>${o.alturaMin.toFixed(2)} m</b> · Status: <b>${o.critico ? "CRÍTICO" : "OK"}</b>
     `;
@@ -940,24 +1021,17 @@ function verificarObstaculosNaRota(skipAlert = false) {
 }
 
 /* =========================================================
-   COMPARTILHAR ROTA (link interno, sem limite de waypoints)
+   COMPARTILHAR ROTA
    ========================================================= */
 function compartilharRota() {
-  const origem = $("origem").value.trim();
+  const origem  = $("origem").value.trim();
   const destino = $("destino").value.trim();
   const altura  = $("alturaCaminhao").value.trim();
 
-  if (!origem || !destino) {
-    alert("Preencha origem e destino antes de compartilhar.");
-    return;
-  }
+  if (!origem || !destino) { alert("Preencha origem e destino antes de compartilhar."); return; }
+  if (!rotaAtual?.routes?.[0])  { alert("Calcule a rota primeiro."); return; }
 
-  if (!rotaAtual?.routes?.[0]) {
-    alert("Calcule a rota primeiro.");
-    return;
-  }
-
-  const path = rotaAtual.routes[0].overview_path;
+  const path     = rotaAtual.routes[0].overview_path;
   const interior = path.slice(1, path.length - 1);
   const MAX = 200;
   let pontos = [];
@@ -968,8 +1042,7 @@ function compartilharRota() {
     const step = (interior.length - 1) / (MAX - 1);
     for (let i = 0; i < MAX; i++) {
       const idx = Math.round(i * step);
-      const p = interior[idx];
-      pontos.push([+p.lat().toFixed(6), +p.lng().toFixed(6)]);
+      pontos.push([+interior[idx].lat().toFixed(6), +interior[idx].lng().toFixed(6)]);
     }
   }
 
@@ -979,15 +1052,12 @@ function compartilharRota() {
   }
 
   const estado = { origem, destino, altura, polyline, pontos };
-  const json   = JSON.stringify(estado);
-  const b64    = btoa(unescape(encodeURIComponent(json)));
+  const b64    = btoa(unescape(encodeURIComponent(JSON.stringify(estado))));
+  const url    = window.location.href.split("?")[0] + "?r=" + encodeURIComponent(b64);
 
-  const base = window.location.href.split("?")[0];
-  const url  = base + "?r=" + encodeURIComponent(b64);
-
-  $("linkCompartilhado").innerText = url;
-  $("linkCompartilhado").dataset.url = url;
-  $("linkArea").style.display = "block";
+  $("linkCompartilhado").innerText     = url;
+  $("linkCompartilhado").dataset.url   = url;
+  $("linkArea").style.display          = "block";
 
   log(`Link gerado com ${pontos.length} pontos do traçado`);
 }
@@ -997,38 +1067,34 @@ function copiarLink() {
   navigator.clipboard.writeText(url).then(() => {
     const btn = document.querySelector(".copy-btn");
     btn.innerText = "Copiado!";
-    setTimeout(() => { btn.innerText = "ðŸ“‹ Copiar link"; }, 2000);
-  }).catch(() => {
-    prompt("Copie o link abaixo:", url);
-  });
+    setTimeout(() => { btn.innerText = "📋 Copiar link"; }, 2000);
+  }).catch(() => { prompt("Copie o link abaixo:", url); });
 }
 
+/* =========================================================
+   RESTAURAR ROTA DA URL
+   ========================================================= */
 async function restaurarRotaDaURL() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const r = urlParams.get("r");
+  const r = new URLSearchParams(window.location.search).get("r");
   if (!r) return;
 
   try {
     const json = decodeBase64Utf8(r);
     if (!json) throw new Error("Link inválido");
-    const estado = JSON.parse(json);
-    const { origem, destino, altura, polyline = "", pontos = [] } = estado;
+    const { origem, destino, altura, polyline = "", pontos = [] } = JSON.parse(json);
 
-    $("origem").value = origem || "";
-    $("destino").value = destino || "";
-    $("alturaCaminhao").value = altura || "";
+    $("origem").value          = origem  || "";
+    $("destino").value         = destino || "";
+    $("alturaCaminhao").value  = altura  || "";
 
     if (!origem || !destino) return;
 
     setStatus("Restaurando rota do link...", "loading");
     setLoadingState(true);
-    log(`ðŸ” Restaurando rota do link...`);
+    log("🔍 Restaurando rota do link...");
 
-    if (polyline) {
-      await restaurarPolyline(polyline, origem, destino);
-    } else {
-      await restaurarRota(origem, destino, pontos);
-    }
+    if (polyline) await restaurarPolyline(polyline, origem, destino);
+    else          await restaurarRota(origem, destino, pontos);
   } catch (e) {
     log("ERRO — Erro ao restaurar rota da URL: " + e.message);
     setStatus("Erro ao restaurar rota", "error");
@@ -1038,37 +1104,27 @@ async function restaurarRotaDaURL() {
 }
 
 function restaurarPolyline(encodedPolyline, origem, destino) {
-  if (!encodedPolyline || !google?.maps?.geometry?.encoding) {
+  if (!encodedPolyline || !google?.maps?.geometry?.encoding)
     throw new Error("Não foi possível decodificar a rota");
-  }
 
   const path = google.maps.geometry.encoding.decodePath(encodedPolyline);
-  if (!path?.length) {
-    throw new Error("Rota decodificada inválida");
-  }
+  if (!path?.length) throw new Error("Rota decodificada inválida");
 
-  if (directionsRenderer) {
-    directionsRenderer.setMap(null);
-  }
-  if (rotaPolyline) {
-    rotaPolyline.setMap(null);
-  }
+  if (directionsRenderer) directionsRenderer.setMap(null);
+  if (rotaPolyline)        rotaPolyline.setMap(null);
 
   rotaPolyline = new google.maps.Polyline({
-    path,
-    strokeColor: "#1a73e8",
-    strokeWeight: 4,
-    strokeOpacity: 0.9,
-    map
+    path, strokeColor: "#1a73e8", strokeWeight: 4, strokeOpacity: 0.9, map
   });
 
   rotaAtual = {
-    routes: [{
-      overview_path: path,
-      overview_polyline: { points: encodedPolyline }
-    }]
+    routes: [{ overview_path: path, overview_polyline: { points: encodedPolyline } }]
   };
-  log("ðŸ›£ï¸ Rota restaurada a partir do link");
+
+  // Para rotas restauradas de link usamos o overview_path decodificado como path denso
+  rotaPathDenso = path.map(p => ({ lat: p.lat(), lng: p.lng() }));
+
+  log("🛣️ Rota restaurada a partir do link (" + rotaPathDenso.length + " pts)");
   setStatus("Rota restaurada", "ok");
   updateActionButtons();
 
@@ -1078,9 +1134,7 @@ function restaurarPolyline(encodedPolyline, origem, destino) {
 }
 
 async function restaurarRota(origem, destino, pontos) {
-  if (!Array.isArray(pontos) || pontos.length === 0) {
-    return calcularRota();
-  }
+  if (!Array.isArray(pontos) || pontos.length === 0) return calcularRota();
 
   const batches = [];
   for (let i = 0; i < pontos.length; i += MAX_WAYPOINTS_PER_REQUEST) {
@@ -1088,73 +1142,63 @@ async function restaurarRota(origem, destino, pontos) {
   }
 
   let currentOrigin = origem;
-  let combinedPath = [];
+  let combinedPath  = [];
   let lastDirections = null;
+  let combinedDenso  = [];
 
-  for (let index = 0; index < batches.length; index += 1) {
-    const batch = batches[index];
+  for (let index = 0; index < batches.length; index++) {
+    const batch       = batches[index];
     const isLastBatch = index === batches.length - 1;
     const destination = isLastBatch
       ? destino
-      : { lat: batch[batch.length - 1][0], lng: batch[batch.length - 1][1] };
-
+      : { lat: batch[batch.length-1][0], lng: batch[batch.length-1][1] };
     const waypoints = isLastBatch
-      ? batch.map(([lat, lng]) => ({ location: { lat, lng }, stopover: false }))
-      : batch.slice(0, -1).map(([lat, lng]) => ({ location: { lat, lng }, stopover: false }));
+      ? batch.map(([lat,lng]) => ({ location:{lat,lng}, stopover:false }))
+      : batch.slice(0,-1).map(([lat,lng]) => ({ location:{lat,lng}, stopover:false }));
 
-    const res = await requestRoute({
-      origin: currentOrigin,
-      destination,
-      travelMode: "DRIVING",
-      waypoints,
-      optimizeWaypoints: false
+    const res  = await requestRoute({
+      origin: currentOrigin, destination, travelMode: "DRIVING",
+      waypoints, optimizeWaypoints: false
     });
 
     const path = res.routes[0].overview_path || [];
     if (combinedPath.length && path.length) {
-      const lastPoint = combinedPath[combinedPath.length - 1];
-      if (lastPoint.lat() === path[0].lat() && lastPoint.lng() === path[0].lng()) {
-        path.shift();
-      }
+      const lp = combinedPath[combinedPath.length-1];
+      if (lp.lat() === path[0].lat() && lp.lng() === path[0].lng()) path.shift();
     }
-
-    combinedPath = combinedPath.concat(path);
-    currentOrigin = destination;
+    combinedPath   = combinedPath.concat(path);
+    combinedDenso  = combinedDenso.concat(extrairPathDenso(res));
+    currentOrigin  = destination;
     lastDirections = res;
   }
 
-  if (!lastDirections) {
-    throw new Error("Não foi possível restaurar a rota");
-  }
+  if (!lastDirections) throw new Error("Não foi possível restaurar a rota");
 
-  if (directionsRenderer) {
-    directionsRenderer.setMap(null);
-  }
+  if (directionsRenderer) directionsRenderer.setMap(null);
+  if (rotaPolyline)        rotaPolyline.setMap(null);
 
-  if (rotaPolyline) rotaPolyline.setMap(null);
-  rotaPolyline = new google.maps.Polyline({ path: combinedPath, map, strokeColor: "#1a73e8", strokeWeight: 4, strokeOpacity: 0.9 });
+  rotaPolyline = new google.maps.Polyline({
+    path: combinedPath, map, strokeColor: "#1a73e8", strokeWeight: 4, strokeOpacity: 0.9
+  });
 
   let encodedPolyline = "";
   if (google?.maps?.geometry?.encoding && combinedPath.length) {
-    try {
-      encodedPolyline = google.maps.geometry.encoding.encodePath(new google.maps.MVCArray(combinedPath));
-    } catch {
-      encodedPolyline = lastDirections.routes[0]?.overview_polyline?.points || "";
-    }
+    try { encodedPolyline = google.maps.geometry.encoding.encodePath(new google.maps.MVCArray(combinedPath)); }
+    catch { encodedPolyline = lastDirections.routes[0]?.overview_polyline?.points || ""; }
   }
 
   rotaAtual = {
-    routes: [{
-      overview_path: combinedPath,
-      overview_polyline: { points: encodedPolyline }
-    }]
+    routes: [{ overview_path: combinedPath, overview_polyline: { points: encodedPolyline } }]
   };
+  rotaPathDenso = combinedDenso.length > 0
+    ? combinedDenso
+    : combinedPath.map(p => ({ lat: p.lat(), lng: p.lng() }));
 
   const bounds = new google.maps.LatLngBounds();
-  combinedPath.forEach(point => bounds.extend(point));
+  combinedPath.forEach(p => bounds.extend(p));
   map.fitBounds(bounds);
 
-  log("ðŸ›£ï¸ Rota restaurada a partir do link");
+  log("🛣️ Rota restaurada a partir do link (" + rotaPathDenso.length + " pts)");
   setStatus("Rota restaurada", "ok");
   updateActionButtons();
 
@@ -1164,313 +1208,181 @@ async function restaurarRota(origem, destino, pontos) {
 }
 
 /* =========================================================
-   GERAR MAPA ESTÁTICO
+   MAPA ESTÁTICO / PDF
    ========================================================= */
 async function gerarMapaEstatico(origem, destino, obstaculosParaPDF) {
   const criticos = obstaculosParaPDF.filter(o => o.critico).slice(0, 8);
-  const seguros = obstaculosParaPDF.filter(o => !o.critico).slice(0, 5);
+  const seguros  = obstaculosParaPDF.filter(o => !o.critico).slice(0, 5);
 
-  const originMarker = origem ? `&markers=color:blue|label:S|${encodeURIComponent(origem)}` : "";
+  const originMarker      = origem  ? `&markers=color:blue|label:S|${encodeURIComponent(origem)}`  : "";
   const destinationMarker = destino ? `&markers=color:blue|label:F|${encodeURIComponent(destino)}` : "";
 
   let obstaclesMarkers = "";
-  if (criticos.length) {
-    const pins = criticos.map(o => `${o.lat.toFixed(5)},${o.lng.toFixed(5)}`).join("|");
-    obstaclesMarkers += `&markers=color:red|size:small|${pins}`;
-  }
-  if (seguros.length) {
-    const pins = seguros.map(o => `${o.lat.toFixed(5)},${o.lng.toFixed(5)}`).join("|");
-    obstaclesMarkers += `&markers=color:green|size:small|${pins}`;
-  }
+  if (criticos.length) obstaclesMarkers += `&markers=color:red|size:small|${criticos.map(o=>`${o.lat.toFixed(5)},${o.lng.toFixed(5)}`).join("|")}`;
+  if (seguros.length)  obstaclesMarkers += `&markers=color:green|size:small|${seguros.map(o=>`${o.lat.toFixed(5)},${o.lng.toFixed(5)}`).join("|")}`;
 
-  const encodedPath = await getEncodedPath();
+  const encodedPath = rotaAtual?.routes?.[0]?.overview_polyline?.points || "";
   const path = encodedPath ? `&path=color:0xf5a623ff|weight:3|enc:${encodeURIComponent(encodedPath)}` : "";
 
-  const url = `https://maps.googleapis.com/maps/api/staticmap?`
-    + `size=800x400`
-    + `&scale=2`
-    + `&maptype=roadmap`
-    + originMarker
-    + destinationMarker
-    + obstaclesMarkers
-    + path
+  return `https://maps.googleapis.com/maps/api/staticmap?size=800x400&scale=2&maptype=roadmap`
+    + originMarker + destinationMarker + obstaclesMarkers + path
     + `&key=${STATIC_MAPS_KEY}`;
-
-  return url;
 }
-
-async function getEncodedPath() {
-  if (!rotaAtual?.routes?.[0]?.overview_polyline?.points) return "";
-  return rotaAtual.routes[0].overview_polyline.points;
-}
-
-/* =========================================================
-   GERAR PDF
-   ========================================================= */
 
 async function capturarMapa() {
-  const mapDiv = document.getElementById("map");
-
   try {
-    const canvas = await html2canvas(mapDiv, {
-      useCORS: true,
-      allowTaint: false,
-      scale: 2
-    });
-
+    const canvas = await html2canvas(document.getElementById("map"), { useCORS:true, allowTaint:false, scale:2 });
     return canvas.toDataURL("image/png");
-  } catch (e) {
+  } catch(e) {
     log("ERRO — Erro ao capturar mapa");
     return null;
   }
 }
-  
-async function gerarPDF() {
-  const origem = $("origem").value.trim();
-  const destino = $("destino").value.trim();
-  const alturaTxt = $("alturaCaminhao").value;
-  const altura = parseNumeroFlex(alturaTxt);
 
-  if (!origem || !destino) { alert("Defina a rota primeiro."); return; }
-  if (isNaN(altura)) { alert("Informe a altura do caminhão."); return; }
+function carregarImagemBase64(url) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      c.getContext("2d").drawImage(img, 0, 0);
+      try { resolve(c.toDataURL("image/png")); } catch(e) { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+async function gerarPDF() {
+  const origem   = $("origem").value.trim();
+  const destino  = $("destino").value.trim();
+  const altura   = parseNumeroFlex($("alturaCaminhao").value);
+
+  if (!origem || !destino)  { alert("Defina a rota primeiro."); return; }
+  if (isNaN(altura))        { alert("Informe a altura do caminhão."); return; }
   if (!obstaculosNaRota.length && !basesCarregadas) {
-    alert("Verifique os obstáculos na rota antes de exportar.");
-    return;
+    alert("Verifique os obstáculos na rota antes de exportar."); return;
   }
 
   setStatus("Gerando PDF...", "loading");
   log("Gerando relatório PDF...");
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
+  const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
   const W = 210, margin = 14;
   let y = 0;
 
-  // ---- CABEÇALHO ----
-  doc.setFillColor(15, 17, 23);
-  doc.rect(0, 0, W, 38, "F");
-
-  doc.setFillColor(245, 166, 35);
-  doc.rect(0, 36, W, 2, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(245, 166, 35);
+  // CABEÇALHO
+  doc.setFillColor(15,17,23); doc.rect(0,0,W,38,"F");
+  doc.setFillColor(245,166,35); doc.rect(0,36,W,2,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(20); doc.setTextColor(245,166,35);
   doc.text("TRANSPES GO", margin, 18);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(180, 190, 210);
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(180,190,210);
   doc.text("Relatório de Análise de Rota e Obstáculos", margin, 26);
-
   const agora = new Date();
-  doc.setFontSize(8);
-  doc.setTextColor(120, 130, 155);
-  doc.text("Gerado em: " + agora.toLocaleString("pt-BR"), W - margin, 26, { align: "right" });
-
+  doc.setFontSize(8); doc.setTextColor(120,130,155);
+  doc.text("Gerado em: " + agora.toLocaleString("pt-BR"), W-margin, 26, { align:"right" });
   y = 46;
 
-  // ---- DADOS DA ROTA ----
-  doc.setFillColor(24, 28, 39);
-  doc.roundedRect(margin, y, W - margin*2, 30, 3, 3, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(245, 166, 35);
-  doc.text("DADOS DA ROTA", margin + 6, y + 8);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(200, 210, 225);
-  doc.text("Origem:", margin + 6, y + 16);
-  doc.setFont("helvetica", "bold");
-  doc.text(origem, margin + 28, y + 16);
-
-  doc.setFont("helvetica", "normal");
-  doc.text("Destino:", margin + 6, y + 22);
-  doc.setFont("helvetica", "bold");
-  doc.text(destino, margin + 28, y + 22);
-
-  doc.setFont("helvetica", "normal");
-  doc.text("Altura do veículo:", margin + 6, y + 28);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(245, 166, 35);
-  doc.text(altura.toFixed(2) + " m", margin + 50, y + 28);
-
+  // DADOS DA ROTA
+  doc.setFillColor(24,28,39); doc.roundedRect(margin,y,W-margin*2,30,3,3,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(245,166,35);
+  doc.text("DADOS DA ROTA", margin+6, y+8);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(200,210,225);
+  doc.text("Origem:", margin+6, y+16); doc.setFont("helvetica","bold"); doc.text(origem, margin+28, y+16);
+  doc.setFont("helvetica","normal"); doc.text("Destino:", margin+6, y+22); doc.setFont("helvetica","bold"); doc.text(destino, margin+28, y+22);
+  doc.setFont("helvetica","normal"); doc.text("Altura do veículo:", margin+6, y+28);
+  doc.setFont("helvetica","bold"); doc.setTextColor(245,166,35); doc.text(altura.toFixed(2)+" m", margin+50, y+28);
   y += 38;
 
-  // ---- MAPA ESTÁTICO ----
+  // MAPA
   try {
     let imgData = await capturarMapa();
     if (!imgData) {
       const staticUrl = await gerarMapaEstatico(origem, destino, obstaculosNaRota);
       if (staticUrl) imgData = await carregarImagemBase64(staticUrl);
     }
+    if (imgData) { doc.addImage(imgData,"PNG",margin,y,W-margin*2,60); y += 65; }
+    else { y += 4; }
+  } catch(e) { y += 4; }
 
-    if (imgData) {
-      doc.addImage(imgData, "PNG", margin, y, W - margin*2, 60);
-      y += 65;
-    } else {
-      log("ERRO — Mapa não disponível para PDF — continuando sem imagem");
-      y += 4;
-    }
-  } catch(e) {
-    log("ERRO — Mapa estático não disponível — continuando sem imagem");
-    y += 4;
-  }
-
-  // ---- RESUMO ----
-  const criticos = obstaculosNaRota.filter(o => o.critico).length;
-  const seguros = obstaculosNaRota.length - criticos;
-
-  doc.setFillColor(24, 28, 39);
-  doc.roundedRect(margin, y, (W - margin*2 - 6) / 2, 22, 3, 3, "F");
-  doc.setFillColor(24, 28, 39);
-  doc.roundedRect(margin + (W - margin*2 - 6)/2 + 6, y, (W - margin*2 - 6)/2, 22, 3, 3, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.setTextColor(224, 58, 58);
-  doc.text(String(criticos), margin + (W - margin*2 - 6)/4, y + 13, { align: "center" });
-  doc.setFontSize(8);
-  doc.setTextColor(140, 150, 170);
-  doc.text("OBSTÁCULOS CRÍTICOS", margin + (W - margin*2 - 6)/4, y + 19, { align: "center" });
-
-  const col2x = margin + (W - margin*2 - 6)/2 + 6 + (W - margin*2 - 6)/4;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.setTextColor(46, 207, 122);
-  doc.text(String(seguros), col2x, y + 13, { align: "center" });
-  doc.setFontSize(8);
-  doc.setTextColor(140, 150, 170);
-  doc.text("OBSTÁCULOS OK", col2x, y + 19, { align: "center" });
-
+  // RESUMO
+  const criticos = obstaculosNaRota.filter(o=>o.critico).length;
+  const seguros  = obstaculosNaRota.length - criticos;
+  doc.setFillColor(24,28,39);
+  doc.roundedRect(margin,y,(W-margin*2-6)/2,22,3,3,"F");
+  doc.roundedRect(margin+(W-margin*2-6)/2+6,y,(W-margin*2-6)/2,22,3,3,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(224,58,58);
+  doc.text(String(criticos), margin+(W-margin*2-6)/4, y+13, {align:"center"});
+  doc.setFontSize(8); doc.setTextColor(140,150,170);
+  doc.text("OBSTÁCULOS CRÍTICOS", margin+(W-margin*2-6)/4, y+19, {align:"center"});
+  const col2x = margin+(W-margin*2-6)/2+6+(W-margin*2-6)/4;
+  doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(46,207,122);
+  doc.text(String(seguros), col2x, y+13, {align:"center"});
+  doc.setFontSize(8); doc.setTextColor(140,150,170);
+  doc.text("OBSTÁCULOS OK", col2x, y+19, {align:"center"});
   y += 30;
 
-  // ---- TABELA DE OBSTÁCULOS ----
+  // TABELA
   if (obstaculosNaRota.length > 0) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(245, 166, 35);
+    doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(245,166,35);
     doc.text("OBSTÁCULOS ENCONTRADOS NA ROTA", margin, y);
     y += 6;
 
-    doc.setFillColor(30, 35, 51);
-    doc.rect(margin, y, W - margin*2, 7, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(180, 190, 210);
-
-    const cols = [margin+2, margin+52, margin+72, margin+92, margin+115, margin+138, margin+160];
-    const headers = ["Via / Local", "UF", "KM", "Altura mín.", "Caminhão", "Base", "Status"];
-    headers.forEach((h, i) => doc.text(h, cols[i], y + 5));
+    doc.setFillColor(30,35,51); doc.rect(margin,y,W-margin*2,7,"F");
+    doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(180,190,210);
+    const cols    = [margin+2, margin+46, margin+66, margin+86, margin+109, margin+130, margin+152, margin+174];
+    const headers = ["Via / Local","UF","KM","Alt.mín.","Veículo","Fonte","Base","Status"];
+    headers.forEach((h,i) => doc.text(h, cols[i], y+5));
     y += 8;
 
-    obstaculosNaRota.forEach((o, idx) => {
-      if (y > 265) {
-        doc.addPage();
-        y = 20;
-      }
-
-      const bg = idx % 2 === 0 ? [20, 23, 35] : [24, 28, 39];
-      doc.setFillColor(...bg);
-      doc.rect(margin, y, W - margin*2, 8, "F");
-
-      if (o.critico) {
-        doc.setFillColor(224, 58, 58, 0.15);
-        doc.rect(margin, y, 3, 8, "F");
-        doc.setFillColor(224, 58, 58);
-        doc.rect(margin, y, 2, 8, "F");
-      } else {
-        doc.setFillColor(46, 207, 122);
-        doc.rect(margin, y, 2, 8, "F");
-      }
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(200, 210, 225);
-
-      const viaTexto = (o.via || "Via não informada").substring(0, 28);
-      doc.text(viaTexto, cols[0], y + 5.5);
-      doc.text(o.uf || "-", cols[1], y + 5.5);
-      doc.text(o.km || "-", cols[2], y + 5.5);
-      doc.text(o.alturaMin.toFixed(2) + " m", cols[3], y + 5.5);
-      doc.text(altura.toFixed(2) + " m", cols[4], y + 5.5);
-      doc.text((o.origemBase || "-").substring(0, 14), cols[5], y + 5.5);
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(o.critico ? 224 : 46, o.critico ? 58 : 207, o.critico ? 58 : 122);
-      doc.text(o.critico ? "CRÍTICO" : "OK", cols[6], y + 5.5);
-
+    obstaculosNaRota.forEach((o,idx) => {
+      if (y > 265) { doc.addPage(); y = 20; }
+      doc.setFillColor(...(idx%2===0 ? [20,23,35] : [24,28,39])); doc.rect(margin,y,W-margin*2,8,"F");
+      doc.setFillColor(...(o.critico ? [224,58,58] : [46,207,122])); doc.rect(margin,y,2,8,"F");
+      doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(200,210,225);
+      doc.text((o.via||"Via não informada").substring(0,22), cols[0], y+5.5);
+      doc.text(o.uf||"-",                                    cols[1], y+5.5);
+      doc.text(o.km||"-",                                    cols[2], y+5.5);
+      doc.text(o.alturaMin.toFixed(2)+" m",                  cols[3], y+5.5);
+      doc.text(altura.toFixed(2)+" m",                       cols[4], y+5.5);
+      doc.text((o.fonte||"-").substring(0,12),               cols[5], y+5.5);
+      doc.text((o.origemBase||"-").substring(0,12),          cols[6], y+5.5);
+      doc.setFont("helvetica","bold");
+      doc.setTextColor(o.critico?224:46, o.critico?58:207, o.critico?58:122);
+      doc.text(o.critico?"CRÍTICO":"OK",                     cols[7], y+5.5);
       y += 8;
     });
   } else {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(140, 150, 170);
+    doc.setFont("helvetica","italic"); doc.setFontSize(9); doc.setTextColor(140,150,170);
     doc.text("Nenhum obstáculo encontrado na rota verificada.", margin, y);
     y += 10;
   }
 
   y += 6;
   if (y > 260) { doc.addPage(); y = 20; }
-
-  const linkMaps = `https://www.google.com/maps/dir/?api=1`
-    + `&origin=${encodeURIComponent(origem)}`
-    + `&destination=${encodeURIComponent(destino)}`
-    + `&travelmode=driving`;
-
-  doc.setFillColor(24, 28, 39);
-  doc.roundedRect(margin, y, W - margin*2, 18, 3, 3, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(245, 166, 35);
-  doc.text("LINK DA ROTA NO GOOGLE MAPS", margin + 6, y + 7);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(100, 140, 220);
-  doc.textWithLink(linkMaps.substring(0, 95) + "...", margin + 6, y + 13, { url: linkMaps });
+  const linkMaps = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origem)}&destination=${encodeURIComponent(destino)}&travelmode=driving`;
+  doc.setFillColor(24,28,39); doc.roundedRect(margin,y,W-margin*2,18,3,3,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.setTextColor(245,166,35);
+  doc.text("LINK DA ROTA NO GOOGLE MAPS", margin+6, y+7);
+  doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(100,140,220);
+  doc.textWithLink(linkMaps.substring(0,95)+"...", margin+6, y+13, {url:linkMaps});
 
   const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
+  for (let i=1; i<=pageCount; i++) {
     doc.setPage(i);
-    doc.setFillColor(15, 17, 23);
-    doc.rect(0, 285, W, 12, "F");
-    doc.setFillColor(245, 166, 35);
-    doc.rect(0, 284, W, 1, "F");
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(100, 110, 135);
+    doc.setFillColor(15,17,23); doc.rect(0,285,W,12,"F");
+    doc.setFillColor(245,166,35); doc.rect(0,284,W,1,"F");
+    doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(100,110,135);
     doc.text("Transpes GO — Desenvolvido por Caio Bertolato Pereira", margin, 291);
-    doc.text(`Página ${i} de ${pageCount}`, W - margin, 291, { align: "right" });
+    doc.text(`Página ${i} de ${pageCount}`, W-margin, 291, {align:"right"});
   }
 
-  const nomeArquivo = `transpes-go-rota-${agora.toLocaleDateString("pt-BR").replace(/\//g, "-")}.pdf`;
+  const nomeArquivo = `transpes-go-rota-${agora.toLocaleDateString("pt-BR").replace(/\//g,"-")}.pdf`;
   doc.save(nomeArquivo);
-
   setStatus("PDF gerado com sucesso", "ok");
   log("Relatório PDF salvo: " + nomeArquivo);
-}
-
-function carregarImagemBase64(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      canvas.getContext("2d").drawImage(img, 0, 0);
-      try {
-        resolve(canvas.toDataURL("image/png"));
-      } catch(e) {
-        resolve(null);
-      }
-    };
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
 }
 </script>
 
