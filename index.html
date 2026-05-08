@@ -1023,6 +1023,48 @@ function verificarObstaculosNaRota(skipAlert = false) {
 /* =========================================================
    COMPARTILHAR ROTA
    ========================================================= */
+
+/**
+ * Coleta todos os via_waypoints de todas as legs da rota atual.
+ * Esses são os pontos exatos onde o usuário arrastou o traçado.
+ * Retorna array de { lat, lng, legIndex, stepIndex } para que possamos
+ * inseri-los na posição correta dentro do overview_path.
+ */
+function coletarPontosDeArraste() {
+  const route = rotaAtual?.routes?.[0];
+  if (!route?.legs) return [];
+
+  const arrastes = [];
+  route.legs.forEach((leg, legIdx) => {
+    (leg.via_waypoints || []).forEach(wp => {
+      arrastes.push({
+        lat: typeof wp.lat === "function" ? wp.lat() : wp.lat,
+        lng: typeof wp.lng === "function" ? wp.lng() : wp.lng,
+        legIdx
+      });
+    });
+  });
+  return arrastes;
+}
+
+/**
+ * Dado o overview_path (array de LatLng) e um ponto de arraste { lat, lng },
+ * devolve o índice do ponto do path mais próximo a ele.
+ * Usamos isso para saber a posição relativa do arraste no path e assim
+ * garantir que a amostragem respeite a ordem geográfica.
+ */
+function indiceMaisProximoNoPath(path, lat, lng) {
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < path.length; i++) {
+    const pLat = typeof path[i].lat === "function" ? path[i].lat() : path[i].lat;
+    const pLng = typeof path[i].lng === "function" ? path[i].lng() : path[i].lng;
+    const d = Math.hypot(pLat - lat, pLng - lng);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  return bestIdx;
+}
+
 function compartilharRota() {
   const origem  = $("origem").value.trim();
   const destino = $("destino").value.trim();
@@ -1031,35 +1073,112 @@ function compartilharRota() {
   if (!origem || !destino) { alert("Preencha origem e destino antes de compartilhar."); return; }
   if (!rotaAtual?.routes?.[0])  { alert("Calcule a rota primeiro."); return; }
 
-  const path     = rotaAtual.routes[0].overview_path;
-  const interior = path.slice(1, path.length - 1);
-  const MAX = 200;
-  let pontos = [];
+  const route    = rotaAtual.routes[0];
+  const fullPath = route.overview_path; // array de LatLng
+  const MAX      = 200;
 
-  if (interior.length <= MAX) {
-    pontos = interior.map(p => [+p.lat().toFixed(6), +p.lng().toFixed(6)]);
-  } else {
-    const step = (interior.length - 1) / (MAX - 1);
-    for (let i = 0; i < MAX; i++) {
-      const idx = Math.round(i * step);
-      pontos.push([+interior[idx].lat().toFixed(6), +interior[idx].lng().toFixed(6)]);
+  // ── 1. Coletar pontos de arraste e localizar no path ──────────
+  const arrastes = coletarPontosDeArraste();
+  // Cada arraste vira { lat, lng, pathIdx } — posição aproximada no overview_path
+  const arrastesMapeados = arrastes.map(a => ({
+    lat: a.lat,
+    lng: a.lng,
+    pathIdx: indiceMaisProximoNoPath(fullPath, a.lat, a.lng)
+  }));
+  // Ordena pela posição no path para manter ordem geográfica
+  arrastesMapeados.sort((a, b) => a.pathIdx - b.pathIdx);
+
+  const numArrastes = arrastesMapeados.length;
+
+  // ── 2. Construir os 200 pontos ────────────────────────────────
+  // Estratégia:
+  //   a) Os pontos de arraste são obrigatórios (reservamos slots para eles).
+  //   b) O restante (MAX - numArrastes) é preenchido com pontos amostrados
+  //      uniformemente do interior do overview_path (excluindo origem/destino).
+  //   c) Juntamos tudo, removemos duplicatas próximas e ordenamos pelo path.
+
+  const interior = fullPath.slice(1, fullPath.length - 1);
+  const slotsLivres = Math.max(0, MAX - numArrastes);
+
+  // Amostragem uniforme do interior
+  let amostrados = [];
+  if (interior.length <= slotsLivres) {
+    amostrados = interior.map(p => ({
+      lat: typeof p.lat === "function" ? p.lat() : p.lat,
+      lng: typeof p.lng === "function" ? p.lng() : p.lng,
+      pathIdx: fullPath.indexOf(p)  // aproximado; refinado abaixo
+    }));
+  } else if (slotsLivres > 0) {
+    const step = (interior.length - 1) / (slotsLivres - 1);
+    for (let i = 0; i < slotsLivres; i++) {
+      const idx = Math.min(Math.round(i * step), interior.length - 1);
+      const p   = interior[idx];
+      amostrados.push({
+        lat: typeof p.lat === "function" ? p.lat() : p.lat,
+        lng: typeof p.lng === "function" ? p.lng() : p.lng,
+        pathIdx: idx + 1  // +1 porque cortamos o primeiro ponto (origem)
+      });
     }
   }
 
-  let polyline = rotaAtual?.routes?.[0]?.overview_polyline?.points || "";
+  // ── 3. Fundir arrastes + amostrados, ordenar, deduplicar ──────
+  const todos = [...arrastesMapeados, ...amostrados];
+  todos.sort((a, b) => a.pathIdx - b.pathIdx);
+
+  // Remove pontos muito próximos (< ~5 m) para não desperdiçar slots
+  const DEDUP_GRAUS = 0.00005;
+  const deduplicados = [];
+  for (const pt of todos) {
+    const ultimo = deduplicados[deduplicados.length - 1];
+    if (!ultimo ||
+        Math.abs(pt.lat - ultimo.lat) > DEDUP_GRAUS ||
+        Math.abs(pt.lng - ultimo.lng) > DEDUP_GRAUS) {
+      deduplicados.push(pt);
+    }
+  }
+
+  // Garante no máximo MAX pontos (preserva arrastes sempre)
+  let pontosFinal = deduplicados;
+  if (pontosFinal.length > MAX) {
+    // Marca os arrastes para proteção
+    const setArrastes = new Set(arrastesMapeados.map(a => `${a.lat.toFixed(6)},${a.lng.toFixed(6)}`));
+    const protegidos  = pontosFinal.filter(p => setArrastes.has(`${p.lat.toFixed(6)},${p.lng.toFixed(6)}`));
+    const livres      = pontosFinal.filter(p => !setArrastes.has(`${p.lat.toFixed(6)},${p.lng.toFixed(6)}`));
+
+    // Reamostrar os livres para caber no espaço restante
+    const slotsRestantes = MAX - protegidos.length;
+    let livresAmostrados = [];
+    if (livres.length <= slotsRestantes) {
+      livresAmostrados = livres;
+    } else {
+      const step = (livres.length - 1) / (slotsRestantes - 1);
+      for (let i = 0; i < slotsRestantes; i++) {
+        livresAmostrados.push(livres[Math.min(Math.round(i * step), livres.length - 1)]);
+      }
+    }
+
+    pontosFinal = [...protegidos, ...livresAmostrados];
+    pontosFinal.sort((a, b) => a.pathIdx - b.pathIdx);
+  }
+
+  const pontos = pontosFinal.map(p => [+p.lat.toFixed(6), +p.lng.toFixed(6)]);
+
+  // ── 4. Polyline de fallback ───────────────────────────────────
+  let polyline = route?.overview_polyline?.points || "";
   if (!polyline && rotaPolyline && google?.maps?.geometry?.encoding) {
     polyline = google.maps.geometry.encoding.encodePath(rotaPolyline.getPath());
   }
 
+  // ── 5. Montar e publicar o link ───────────────────────────────
   const estado = { origem, destino, altura, polyline, pontos };
   const b64    = btoa(unescape(encodeURIComponent(JSON.stringify(estado))));
   const url    = window.location.href.split("?")[0] + "?r=" + encodeURIComponent(b64);
 
-  $("linkCompartilhado").innerText     = url;
-  $("linkCompartilhado").dataset.url   = url;
-  $("linkArea").style.display          = "block";
+  $("linkCompartilhado").innerText   = url;
+  $("linkCompartilhado").dataset.url = url;
+  $("linkArea").style.display        = "block";
 
-  log(`Link gerado com ${pontos.length} pontos do traçado`);
+  log(`Link gerado: ${pontos.length} pts (${numArrastes} arraste(s) incluídos obrigatoriamente)`);
 }
 
 function copiarLink() {
@@ -1083,18 +1202,29 @@ async function restaurarRotaDaURL() {
     if (!json) throw new Error("Link inválido");
     const { origem, destino, altura, polyline = "", pontos = [] } = JSON.parse(json);
 
-    $("origem").value          = origem  || "";
-    $("destino").value         = destino || "";
-    $("alturaCaminhao").value  = altura  || "";
+    $("origem").value         = origem  || "";
+    $("destino").value        = destino || "";
+    $("alturaCaminhao").value = altura  || "";
 
     if (!origem || !destino) return;
 
     setStatus("Restaurando rota do link...", "loading");
     setLoadingState(true);
-    log("🔍 Restaurando rota do link...");
+    log("🔍 Restaurando rota do link via DirectionsService...");
 
-    if (polyline) await restaurarPolyline(polyline, origem, destino);
-    else          await restaurarRota(origem, destino, pontos);
+    // Sempre tenta recalcular pelo DirectionsService para garantir traçado
+    // fiel às rodovias. A polyline e os pontos salvos são usados apenas como
+    // fallback caso a API falhe.
+    try {
+      await restaurarRota(origem, destino, pontos);
+    } catch (errApi) {
+      log("⚠️ DirectionsService falhou — tentando fallback visual...");
+      if (polyline) {
+        restaurarPolylineFallback(polyline);
+      } else {
+        throw errApi;
+      }
+    }
   } catch (e) {
     log("ERRO — Erro ao restaurar rota da URL: " + e.message);
     setStatus("Erro ao restaurar rota", "error");
@@ -1103,12 +1233,14 @@ async function restaurarRotaDaURL() {
   }
 }
 
-function restaurarPolyline(encodedPolyline, origem, destino) {
+// Usado APENAS como fallback visual quando o DirectionsService falha.
+// Plota a polyline codificada diretamente, sem passar pela API de direções.
+function restaurarPolylineFallback(encodedPolyline) {
   if (!encodedPolyline || !google?.maps?.geometry?.encoding)
-    throw new Error("Não foi possível decodificar a rota");
+    throw new Error("Não foi possível decodificar a rota de fallback");
 
   const path = google.maps.geometry.encoding.decodePath(encodedPolyline);
-  if (!path?.length) throw new Error("Rota decodificada inválida");
+  if (!path?.length) throw new Error("Polyline de fallback inválida");
 
   if (directionsRenderer) directionsRenderer.setMap(null);
   if (rotaPolyline)        rotaPolyline.setMap(null);
@@ -1121,11 +1253,14 @@ function restaurarPolyline(encodedPolyline, origem, destino) {
     routes: [{ overview_path: path, overview_polyline: { points: encodedPolyline } }]
   };
 
-  // Para rotas restauradas de link usamos o overview_path decodificado como path denso
   rotaPathDenso = path.map(p => ({ lat: p.lat(), lng: p.lng() }));
 
-  log("🛣️ Rota restaurada a partir do link (" + rotaPathDenso.length + " pts)");
-  setStatus("Rota restaurada", "ok");
+  const bounds = new google.maps.LatLngBounds();
+  path.forEach(p => bounds.extend(p));
+  map.fitBounds(bounds);
+
+  log("🛣️ Rota restaurada via fallback visual (" + rotaPathDenso.length + " pts)");
+  setStatus("Rota restaurada (fallback)", "ok");
   updateActionButtons();
 
   if (parseNumeroFlex($("alturaCaminhao").value) > 0) {
