@@ -1253,16 +1253,72 @@ function compartilharRota() {
     polyline = google.maps.geometry.encoding.encodePath(rotaPolyline.getPath());
   }
 
-  // ── 5. Montar e publicar o link ───────────────────────────────
+  // ── 5. Montar e publicar o link (com compressão lossless) ──────
   const estado = { origem, destino, altura, polyline, pontos };
-  const b64    = btoa(unescape(encodeURIComponent(JSON.stringify(estado))));
-  const url    = window.location.href.split("?")[0] + "?r=" + encodeURIComponent(b64);
+  comprimirEstado(estado).then(payload => {
+    const base = window.location.href.split("?")[0];
+    const url  = base + "?r=" + encodeURIComponent(payload);
 
-  $("linkCompartilhado").innerText   = url;
-  $("linkCompartilhado").dataset.url = url;
-  $("linkArea").style.display        = "block";
+    $("linkCompartilhado").innerText   = url;
+    $("linkCompartilhado").dataset.url = url;
+    $("linkArea").style.display        = "block";
 
-  log(`Link gerado: ${pontos.length} pts (${numArrastes} arraste(s) incluídos obrigatoriamente)`);
+    log(`Link gerado: ${pontos.length} pts (${numArrastes} arraste(s)) · ${url.length} chars`);
+  }).catch(err => {
+    log("ERRO ao gerar link: " + err.message);
+  });
+}
+
+/* =========================================================
+   COMPRESSÃO / DESCOMPRESSÃO DO PAYLOAD DO LINK
+   Usa CompressionStream (deflate-raw) nativo do browser —
+   sem libs externas. Reduz o link em ~60-75%. Lossless.
+   ========================================================= */
+
+async function comprimirEstado(estado) {
+  const json   = JSON.stringify(estado);
+  const bytes  = new TextEncoder().encode(json);
+
+  // Tenta comprimir com CompressionStream (browsers modernos)
+  if (typeof CompressionStream !== "undefined") {
+    const cs     = new CompressionStream("deflate-raw");
+    const writer = cs.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const compressed = await new Response(cs.readable).arrayBuffer();
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(compressed)));
+    return "z." + b64; // prefixo "z." indica payload comprimido
+  }
+
+  // Fallback: sem compressão (browsers muito antigos)
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  return "p." + b64; // prefixo "p." indica payload plain
+}
+
+async function descomprimirEstado(payload) {
+  if (payload.startsWith("z.")) {
+    // Comprimido
+    const b64      = payload.slice(2);
+    const binary   = atob(b64);
+    const bytes    = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const ds       = new DecompressionStream("deflate-raw");
+    const writer   = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const decompressed = await new Response(ds.readable).arrayBuffer();
+    return JSON.parse(new TextDecoder().decode(decompressed));
+  }
+
+  if (payload.startsWith("p.")) {
+    // Plain (fallback antigo)
+    const b64  = payload.slice(2);
+    const json = decodeBase64Utf8(b64);
+    return JSON.parse(json);
+  }
+
+  // Links gerados antes da compressão (sem prefixo) — compatibilidade retroativa
+  const json = decodeBase64Utf8(payload);
+  return JSON.parse(json);
 }
 
 function copiarLink() {
@@ -1282,9 +1338,10 @@ async function restaurarRotaDaURL() {
   if (!r) return;
 
   try {
-    const json = decodeBase64Utf8(r);
-    if (!json) throw new Error("Link inválido");
-    const { origem, destino, altura, polyline = "", pontos = [] } = JSON.parse(json);
+    // Suporta links novos (comprimidos) e antigos (plain base64)
+    const estado = await descomprimirEstado(r);
+    if (!estado) throw new Error("Link inválido");
+    const { origem, destino, altura, polyline = "", pontos = [] } = estado;
 
     $("origem").value         = origem  || "";
     $("destino").value        = destino || "";
@@ -1296,9 +1353,6 @@ async function restaurarRotaDaURL() {
     setLoadingState(true);
     log("🔍 Restaurando rota do link via DirectionsService...");
 
-    // Sempre tenta recalcular pelo DirectionsService para garantir traçado
-    // fiel às rodovias. A polyline e os pontos salvos são usados apenas como
-    // fallback caso a API falhe.
     try {
       await restaurarRota(origem, destino, pontos);
     } catch (errApi) {
