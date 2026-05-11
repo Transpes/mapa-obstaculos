@@ -841,6 +841,90 @@ function initMap() {
   log("Mapa inicializado");
   setStatus("Carregando bases...", "loading");
   carregarTodasAsBases();
+  iniciarGeolocalizacao();
+}
+
+/* =========================================================
+   GEOLOCALIZAÇÃO — marcador "você está aqui"
+   Só visual. Não altera rota, obstáculos nem link.
+   ========================================================= */
+let marcadorPosicao = null;
+let circuloPrecisao = null;
+let watchIdGeo      = null;
+
+function iniciarGeolocalizacao() {
+  if (!navigator.geolocation) {
+    log("Geolocalização não suportada pelo navegador");
+    return;
+  }
+
+  const opcoesGeo = {
+    enableHighAccuracy: true,
+    maximumAge:         10000,
+    timeout:            15000
+  };
+
+  navigator.geolocation.getCurrentPosition(
+    atualizarPosicao,
+    erroGeolocalizacao,
+    opcoesGeo
+  );
+
+  watchIdGeo = navigator.geolocation.watchPosition(
+    atualizarPosicao,
+    erroGeolocalizacao,
+    opcoesGeo
+  );
+}
+
+function atualizarPosicao(pos) {
+  const lat     = pos.coords.latitude;
+  const lng     = pos.coords.longitude;
+  const precisao = pos.coords.accuracy;
+  const latLng  = new google.maps.LatLng(lat, lng);
+
+  if (!marcadorPosicao) {
+    marcadorPosicao = new google.maps.Marker({
+      position: latLng,
+      map,
+      icon: {
+        path:         google.maps.SymbolPath.CIRCLE,
+        fillColor:    "#4285F4",
+        fillOpacity:  1,
+        strokeColor:  "#ffffff",
+        strokeWeight: 2,
+        scale:        8
+      },
+      title:  "Você está aqui",
+      zIndex: 999
+    });
+
+    circuloPrecisao = new google.maps.Circle({
+      map,
+      center:        latLng,
+      radius:        precisao,
+      fillColor:     "#4285F4",
+      fillOpacity:   0.08,
+      strokeColor:   "#4285F4",
+      strokeOpacity: 0.25,
+      strokeWeight:  1
+    });
+
+    log("📍 Posição detectada — marcador ativo");
+  } else {
+    marcadorPosicao.setPosition(latLng);
+    circuloPrecisao.setCenter(latLng);
+    circuloPrecisao.setRadius(precisao);
+  }
+}
+
+function erroGeolocalizacao(err) {
+  const msgs = {
+    1: "Permissão de localização negada",
+    2: "Posição não disponível",
+    3: "Tempo esgotado ao obter localização"
+  };
+  log("⚠️ Geo: " + (msgs[err.code] || err.message));
 }
 
 /* =========================================================
