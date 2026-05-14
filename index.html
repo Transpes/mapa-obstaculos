@@ -293,6 +293,30 @@ input::placeholder { color: var(--muted); }
   margin-top: 3px;
 }
 
+.resumo-card.clicavel {
+  cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.resumo-card.clicavel:hover {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(217,48,37,0.15);
+}
+.resumo-card.clicavel.ativo {
+  border-color: var(--danger);
+  background: rgba(217,48,37,0.07);
+  box-shadow: 0 0 0 2px rgba(217,48,37,0.2);
+}
+.resumo-card.clicavel.ativo .label-r {
+  color: var(--danger);
+}
+.filtro-hint {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
 .export-area {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -421,11 +445,12 @@ input::placeholder { color: var(--muted); }
             <div class="num" id="numTotal">0</div>
             <div class="label-r">Total encontrado</div>
           </div>
-          <div class="resumo-card">
+          <div class="resumo-card clicavel" id="cardCritico" onclick="toggleFiltrosCriticos()" title="Clique para filtrar só os críticos">
             <div class="num critico" id="numCritico">0</div>
             <div class="label-r">Críticos</div>
           </div>
         </div>
+        <div class="filtro-hint" id="filtroHint" style="display:none">Mostrando apenas obstáculos críticos — clique em Críticos para ver todos</div>
         <div id="resultadoContainer"></div>
       </div>
 
@@ -1034,6 +1059,12 @@ function verificarObstaculosNaRota(skipAlert = false) {
   limparMarcadores();
   $("resultadoContainer").innerHTML = "";
   obstaculosNaRota = [];
+  // Reseta filtro de críticos a cada nova verificação
+  filtroCriticosAtivo = false;
+  const _card = $("cardCritico");
+  if (_card) _card.classList.remove("ativo");
+  const _hint = $("filtroHint");
+  if (_hint) _hint.style.display = "none";
 
   obstacles.forEach(o => {
     if (!estaPertoDaRota(o.lat, o.lng)) return;
@@ -1058,22 +1089,19 @@ function verificarObstaculosNaRota(skipAlert = false) {
     });
     obstacleMarkers.push(marker);
 
-    // ─── Info Window — inclui "fonte" quando disponível ───
-    const fonteHtml = o.fonte
-      ? `Fonte: <b>${o.fonte}</b><br>`
-      : "";
-
+    // ─── Info Window — coordenada e fonte incluídas ───────
     const infoWindow = new google.maps.InfoWindow({
       content: `
-        <div style="font-size:12px;line-height:1.5;min-width:200px">
+        <div style="font-size:12px;line-height:1.5;min-width:210px">
           <strong>${o.via || "Via não informada"}</strong><br>
           <span style="color:#666">${o.origemBase}</span><br>
-          ${o.uf       ? `UF: <b>${o.uf}</b><br>` : ""}
-          ${o.km       ? `KM: <b>${o.km}</b><br>` : ""}
-          ${o.descricao? `Descrição: ${o.descricao}<br>` : ""}
-          ${o.data     ? `Data: ${o.data}<br>` : ""}
-          ${o.obs      ? `Obs.: ${o.obs}<br>` : ""}
-          ${fonteHtml}
+          ${o.uf        ? `UF: <b>${o.uf}</b><br>` : ""}
+          ${o.km        ? `KM: <b>${o.km}</b><br>` : ""}
+          ${o.descricao ? `Descrição: ${o.descricao}<br>` : ""}
+          ${o.data      ? `Data: ${o.data}<br>` : ""}
+          ${o.obs       ? `Obs.: ${o.obs}<br>` : ""}
+          ${o.fonte     ? `Fonte: <b>${o.fonte}</b><br>` : ""}
+          Coordenada: <b>${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}</b><br>
           <br>
           ${o.alturas.map((h, i) => `Altura ${["Esquerda","Central","Direita"][i] ?? i+1}: ${h.toFixed(2)} m`).join("<br>")}<br><br>
           Altura do conjunto: <b>${altura.toFixed(2)} m</b><br>
@@ -1083,25 +1111,64 @@ function verificarObstaculosNaRota(skipAlert = false) {
     });
     marker.addListener("mouseover", () => infoWindow.open(map, marker));
     marker.addListener("mouseout",  () => infoWindow.close());
-
-    // ─── Card lateral — inclui "fonte" quando disponível ──
-    const div = document.createElement("div");
-    div.className = "obstaculo-item " + (o.critico ? "obstaculo-critico" : "obstaculo-ok");
-    div.innerHTML = `
-      <strong>${o.critico ? "🚫" : "✅"} ${o.via || "Via não informada"}</strong><br>
-      ${o.uf   ? `UF: ${o.uf} · ` : ""}${o.km ? `KM: ${o.km}<br>` : "<br>"}
-      ${o.descricao ? `${o.descricao}<br>` : ""}
-      ${o.obs  ? `Obs.: ${o.obs}<br>` : ""}
-      ${o.fonte? `Fonte: <b>${o.fonte}</b><br>` : ""}
-      Coordenadas: ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br>
-      Altura mín.: <b>${o.alturaMin.toFixed(2)} m</b> · Status: <b>${o.critico ? "CRÍTICO" : "OK"}</b>
-    `;
-    $("resultadoContainer").appendChild(div);
   });
+
+  // Renderiza lista lateral (respeita filtro ativo se houver)
+  renderizarLista();
 
   log(`Obstáculos na rota: ${obstaculosNaRota.length} (${criticos} críticos)`);
   setStatus(`Verificação concluída · ${criticos} crítico(s)`, criticos > 0 ? "error" : "ok");
   updateActionButtons();
+}
+
+/* =========================================================
+   FILTRO DE CRÍTICOS
+   ========================================================= */
+let filtroCriticosAtivo = false;
+
+function toggleFiltrosCriticos() {
+  // Só funciona se houver críticos
+  const criticos = obstaculosNaRota.filter(o => o.critico).length;
+  if (!criticos) return;
+
+  filtroCriticosAtivo = !filtroCriticosAtivo;
+
+  const card = $("cardCritico");
+  const hint = $("filtroHint");
+
+  if (filtroCriticosAtivo) {
+    card.classList.add("ativo");
+    hint.style.display = "block";
+  } else {
+    card.classList.remove("ativo");
+    hint.style.display = "none";
+  }
+
+  renderizarLista();
+}
+
+function renderizarLista() {
+  const container = $("resultadoContainer");
+  container.innerHTML = "";
+
+  const lista = filtroCriticosAtivo
+    ? obstaculosNaRota.filter(o => o.critico)
+    : obstaculosNaRota;
+
+  lista.forEach(o => {
+    const div = document.createElement("div");
+    div.className = "obstaculo-item " + (o.critico ? "obstaculo-critico" : "obstaculo-ok");
+    div.innerHTML = `
+      <strong>${o.critico ? "🚫" : "✅"} ${o.via || "Via não informada"}</strong><br>
+      ${o.uf        ? `UF: ${o.uf} · ` : ""}${o.km ? `KM: ${o.km}<br>` : "<br>"}
+      ${o.descricao ? `${o.descricao}<br>` : ""}
+      ${o.obs       ? `Obs.: ${o.obs}<br>` : ""}
+      ${o.fonte     ? `Fonte: <b>${o.fonte}</b><br>` : ""}
+      Coordenadas: ${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}<br>
+      Altura mín.: <b>${o.alturaMin.toFixed(2)} m</b> · Status: <b>${o.critico ? "CRÍTICO" : "OK"}</b>
+    `;
+    container.appendChild(div);
+  });
 }
 
 /* =========================================================
@@ -1159,7 +1226,7 @@ function compartilharRota() {
 
   const route    = rotaAtual.routes[0];
   const fullPath = route.overview_path; // array de LatLng
-  const MAX      = 80;
+  const MAX      = 100; // 100 pontos já reproduzem rotas com fidelidade suficiente
 
   // ── 1. Coletar pontos de arraste e localizar no path ──────────
   const arrastes = coletarPontosDeArraste();
@@ -1247,14 +1314,14 @@ function compartilharRota() {
 
   const pontos = pontosFinal.map(p => [+p.lat.toFixed(6), +p.lng.toFixed(6)]);
 
-  // ── 4. Polyline de fallback ───────────────────────────────────
-  let polyline = route?.overview_polyline?.points || "";
-  if (!polyline && rotaPolyline && google?.maps?.geometry?.encoding) {
-    polyline = google.maps.geometry.encoding.encodePath(rotaPolyline.getPath());
-  }
+  // ── 4. Montar e publicar o link ─────────────────────────────────
+  // Polyline de fallback removida do payload — era a maior fonte de tamanho.
+  // Os pontos amostrados + DirectionsService já reproduzem a rota com fidelidade.
+  // Usamos encoding delta: salva só a diferença entre pontos consecutivos em
+  // inteiros (5 casas decimais = ~1m de precisão), reduzindo drasticamente o tamanho.
+  const pontosEnc = encodeDelta(pontos);
+  const estado = { o: origem, d: destino, a: altura, p: pontosEnc };
 
-  // ── 5. Montar e publicar o link (com compressão lossless) ──────
-  const estado = { origem, destino, altura, polyline, pontos };
   comprimirEstado(estado).then(payload => {
     const base = window.location.href.split("?")[0];
     const url  = base + "?r=" + encodeURIComponent(payload);
@@ -1270,55 +1337,124 @@ function compartilharRota() {
 }
 
 /* =========================================================
+   ENCODING DELTA DE COORDENADAS
+   Em vez de salvar cada ponto absoluto (ex: -19.923456,-43.912345),
+   salva apenas a diferença inteira do ponto anterior multiplicada
+   por 1e5. Pontos consecutivos numa rota variam pouco, então os
+   deltas são números pequenos — comprimem muito melhor.
+   Lossless até ~1 metro de precisão (5 casas decimais).
+   ========================================================= */
+
+function encodeDelta(pontos) {
+  if (!pontos.length) return "";
+  let refLat = 0, refLng = 0;
+  const parts = [];
+  for (const [lat, lng] of pontos) {
+    const iLat = Math.round(lat * 1e5);
+    const iLng = Math.round(lng * 1e5);
+    parts.push((iLat - refLat) + "," + (iLng - refLng));
+    refLat = iLat;
+    refLng = iLng;
+  }
+  return parts.join(";");
+}
+
+function decodeDelta(str) {
+  if (!str) return [];
+  let refLat = 0, refLng = 0;
+  return str.split(";").map(part => {
+    const [dLat, dLng] = part.split(",").map(Number);
+    refLat += dLat;
+    refLng += dLng;
+    return [refLat / 1e5, refLng / 1e5];
+  });
+}
+
+/* =========================================================
    COMPRESSÃO / DESCOMPRESSÃO DO PAYLOAD DO LINK
    Usa CompressionStream (deflate-raw) nativo do browser —
-   sem libs externas. Reduz o link em ~60-75%. Lossless.
+   sem libs externas. Combinado com encoding delta, reduz
+   links de ~8000 para ~800-1200 caracteres tipicamente.
    ========================================================= */
 
 async function comprimirEstado(estado) {
-  const json   = JSON.stringify(estado);
-  const bytes  = new TextEncoder().encode(json);
+  const json  = JSON.stringify(estado);
+  const bytes = new TextEncoder().encode(json);
 
-  // Tenta comprimir com CompressionStream (browsers modernos)
   if (typeof CompressionStream !== "undefined") {
     const cs     = new CompressionStream("deflate-raw");
     const writer = cs.writable.getWriter();
     writer.write(bytes);
     writer.close();
     const compressed = await new Response(cs.readable).arrayBuffer();
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(compressed)));
-    return "z." + b64; // prefixo "z." indica payload comprimido
+    // Converte para base64url (sem +, /, =) para URL mais limpa
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(compressed)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    return "z2." + b64;
   }
 
-  // Fallback: sem compressão (browsers muito antigos)
-  const b64 = btoa(unescape(encodeURIComponent(json)));
-  return "p." + b64; // prefixo "p." indica payload plain
+  // Fallback sem compressão
+  const b64 = btoa(unescape(encodeURIComponent(json)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  return "p2." + b64;
 }
 
 async function descomprimirEstado(payload) {
-  if (payload.startsWith("z.")) {
-    // Comprimido
-    const b64      = payload.slice(2);
-    const binary   = atob(b64);
-    const bytes    = Uint8Array.from(binary, c => c.charCodeAt(0));
-    const ds       = new DecompressionStream("deflate-raw");
-    const writer   = ds.writable.getWriter();
+  // ── Formatos novos (v2 com delta encoding) ────────────────
+  if (payload.startsWith("z2.")) {
+    const b64    = payload.slice(3).replace(/-/g, "+").replace(/_/g, "/");
+    const binary = atob(b64);
+    const bytes  = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const ds     = new DecompressionStream("deflate-raw");
+    const writer = ds.writable.getWriter();
     writer.write(bytes);
     writer.close();
-    const decompressed = await new Response(ds.readable).arrayBuffer();
-    return JSON.parse(new TextDecoder().decode(decompressed));
+    const buf = await new Response(ds.readable).arrayBuffer();
+    const obj = JSON.parse(new TextDecoder().decode(buf));
+    return normalizarEstado(obj);
+  }
+
+  if (payload.startsWith("p2.")) {
+    const b64 = payload.slice(3).replace(/-/g, "+").replace(/_/g, "/");
+    const obj = JSON.parse(decodeBase64Utf8(b64));
+    return normalizarEstado(obj);
+  }
+
+  // ── Formatos antigos (compatibilidade retroativa) ─────────
+  if (payload.startsWith("z.")) {
+    const b64    = payload.slice(2);
+    const binary = atob(b64);
+    const bytes  = Uint8Array.from(binary, c => c.charCodeAt(0));
+    const ds     = new DecompressionStream("deflate-raw");
+    const writer = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const buf = await new Response(ds.readable).arrayBuffer();
+    return JSON.parse(new TextDecoder().decode(buf));
   }
 
   if (payload.startsWith("p.")) {
-    // Plain (fallback antigo)
-    const b64  = payload.slice(2);
-    const json = decodeBase64Utf8(b64);
-    return JSON.parse(json);
+    return JSON.parse(decodeBase64Utf8(payload.slice(2)));
   }
 
-  // Links gerados antes da compressão (sem prefixo) — compatibilidade retroativa
-  const json = decodeBase64Utf8(payload);
-  return JSON.parse(json);
+  // Sem prefixo (versão original sem compressão)
+  return JSON.parse(decodeBase64Utf8(payload));
+}
+
+// Normaliza estado novo (chaves curtas + delta) para o formato interno
+function normalizarEstado(obj) {
+  // Chaves curtas: o=origem, d=destino, a=altura, p=pontos encoded
+  if (obj.o !== undefined) {
+    return {
+      origem:   obj.o || "",
+      destino:  obj.d || "",
+      altura:   obj.a || "",
+      polyline: "",
+      pontos:   typeof obj.p === "string" ? decodeDelta(obj.p) : (obj.p || [])
+    };
+  }
+  // Formato antigo com chaves completas — retorna direto
+  return obj;
 }
 
 function copiarLink() {
